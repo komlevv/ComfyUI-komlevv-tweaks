@@ -30,6 +30,10 @@ Link Style is the shared tweak group for link-related visual customization.
 Current settings added by this tweak group:
 
 - `Reroute dot radius`
+- `Reroute stroke width`
+- `Reroute stroke color`
+- `Reroute inner stroke color`
+- `Reroute selected ring color`
 - `Link width`
 - `Link stroke width`
 - `Link stroke color`
@@ -37,6 +41,10 @@ Current settings added by this tweak group:
 Current behavior:
 
 - Changes the size of the inline reroute point on links
+- Changes inline reroute dot stroke width
+- Changes inline reroute dot outer stroke color
+- Changes inline reroute dot inner stroke color
+- Changes inline reroute dot selected ring color
 - Changes normal-mode link width
 - Changes normal-mode link stroke width
 - Changes normal-mode link stroke color
