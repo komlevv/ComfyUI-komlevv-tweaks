@@ -165,6 +165,14 @@ function parseCanvasColorToken(value) {
       return { red, green, blue, alpha: 1 };
     }
 
+    if (token.length === 5) {
+      const red = Number.parseInt(token[1] + token[1], 16);
+      const green = Number.parseInt(token[2] + token[2], 16);
+      const blue = Number.parseInt(token[3] + token[3], 16);
+      const alpha = Number.parseInt(token[4] + token[4], 16) / 255;
+      return { red, green, blue, alpha };
+    }
+
     if (token.length === 7) {
       const red = Number.parseInt(token.slice(1, 3), 16);
       const green = Number.parseInt(token.slice(3, 5), 16);
