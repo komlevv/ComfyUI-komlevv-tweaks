@@ -36,9 +36,11 @@ Current settings added by this tweak group:
 - `Reroute selected ring color`
 - `Reroute selected ring stroke width`
 - `Reroute flat fill mode`
+- `Reroute stroke enabled`
 - `Link width`
 - `Link stroke width`
 - `Link stroke color`
+- `Link stroke enabled`
 
 Current behavior:
 
@@ -49,10 +51,12 @@ Current behavior:
 - Changes inline reroute dot selected ring color
 - Changes inline reroute selected ring stroke width independently from other reroute strokes
 - Can switch reroute fill to flat mode (inner highlight uses same fill color as outer)
+- Can toggle reroute circle stroke on/off without affecting selected ring
 - Adds a theme-aware border around settings color preview swatches so white values stay visible on light palettes
 - Changes normal-mode link width
 - Changes normal-mode link stroke width
 - Changes normal-mode link stroke color
+- Can toggle normal-mode link stroke on/off
 - Does not change the white Reroute node
 - Does not override ComfyUI low-quality zoom-out link rendering
 

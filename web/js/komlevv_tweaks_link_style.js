@@ -14,9 +14,13 @@ const SETTING_ID_REROUTE_SELECTED_RING_STROKE_WIDTH =
   "komlevv.tweaks.linkStyle.rerouteSelectedRingStrokeWidth";
 const SETTING_ID_REROUTE_FLAT_FILL_MODE =
   "komlevv.tweaks.linkStyle.rerouteFlatFillMode";
+const SETTING_ID_REROUTE_STROKE_ENABLED =
+  "komlevv.tweaks.linkStyle.rerouteStrokeEnabled";
 const SETTING_ID_LINK_WIDTH = "komlevv.tweaks.linkStyle.linkWidth";
 const SETTING_ID_LINK_STROKE_WIDTH = "komlevv.tweaks.linkStyle.linkStrokeWidth";
 const SETTING_ID_LINK_STROKE_COLOR = "komlevv.tweaks.linkStyle.linkStrokeColor";
+const SETTING_ID_LINK_STROKE_ENABLED =
+  "komlevv.tweaks.linkStyle.linkStrokeEnabled";
 
 const DEFAULT_REROUTE_DOT_RADIUS = 6;
 const MIN_REROUTE_DOT_RADIUS = 3;
@@ -32,6 +36,7 @@ const DEFAULT_REROUTE_SELECTED_RING_STROKE_WIDTH = 0.6;
 const MIN_REROUTE_SELECTED_RING_STROKE_WIDTH = 0.1;
 const MAX_REROUTE_SELECTED_RING_STROKE_WIDTH = 6;
 const DEFAULT_REROUTE_FLAT_FILL_MODE = false;
+const DEFAULT_REROUTE_STROKE_ENABLED = true;
 const DEFAULT_REROUTE_STROKE_OPACITY = 0.5;
 const DEFAULT_REROUTE_INNER_STROKE_OPACITY = 0.3;
 
@@ -44,6 +49,7 @@ const MIN_LINK_STROKE_WIDTH = 1;
 const MAX_LINK_STROKE_WIDTH = 12;
 
 const DEFAULT_LINK_STROKE_COLOR = "000000";
+const DEFAULT_LINK_STROKE_ENABLED = true;
 const DEFAULT_LINK_STROKE_OPACITY = 0.5;
 const DEFAULT_LINK_STROKE_RGBA = `rgba(0,0,0,${DEFAULT_LINK_STROKE_OPACITY})`;
 
@@ -58,9 +64,11 @@ const currentSettings = {
   rerouteSelectedRingColor: DEFAULT_REROUTE_SELECTED_RING_COLOR,
   rerouteSelectedRingStrokeWidth: DEFAULT_REROUTE_SELECTED_RING_STROKE_WIDTH,
   rerouteFlatFillMode: DEFAULT_REROUTE_FLAT_FILL_MODE,
+  rerouteStrokeEnabled: DEFAULT_REROUTE_STROKE_ENABLED,
   linkWidth: DEFAULT_LINK_WIDTH,
   linkStrokeWidth: DEFAULT_LINK_STROKE_WIDTH,
-  linkStrokeColor: DEFAULT_LINK_STROKE_COLOR
+  linkStrokeColor: DEFAULT_LINK_STROKE_COLOR,
+  linkStrokeEnabled: DEFAULT_LINK_STROKE_ENABLED
 };
 
 function clampInteger(value, fallback, min, max) {
@@ -278,12 +286,14 @@ function getEffectiveLinkWidth(canvas) {
 }
 
 function getEffectiveLinkStrokeWidth(linkRenderContext) {
+  if (!currentSettings.linkStrokeEnabled) return 0;
   return linkRenderContext?.lowQuality
     ? DEFAULT_LINK_STROKE_WIDTH
     : currentSettings.linkStrokeWidth;
 }
 
 function getEffectiveLinkStrokeColor(linkRenderContext) {
+  if (!currentSettings.linkStrokeEnabled) return undefined;
   return linkRenderContext?.lowQuality
     ? DEFAULT_LINK_STROKE_RGBA
     : hexToRgba(currentSettings.linkStrokeColor);
@@ -386,6 +396,9 @@ function ensureReroutePatch() {
       const passType = getRerouteStrokePassType(ctx.strokeStyle);
       if (!passType) {
         return originalStroke.apply(this, strokeArgs);
+      }
+      if (!currentSettings.rerouteStrokeEnabled && passType !== "selected") {
+        return undefined;
       }
 
       const originalStrokeStyle = ctx.strokeStyle;
@@ -589,6 +602,12 @@ function applyRerouteFlatFillMode(value) {
   redrawCanvas();
 }
 
+function applyRerouteStrokeEnabled(value) {
+  currentSettings.rerouteStrokeEnabled = Boolean(value);
+  ensurePatches();
+  redrawCanvas();
+}
+
 function applyLinkWidth(value) {
   currentSettings.linkWidth = clampInteger(
     value,
@@ -615,6 +634,12 @@ function applyLinkStrokeWidth(value) {
 
 function applyLinkStrokeColor(value) {
   currentSettings.linkStrokeColor = normalizeHexColor(value);
+  ensurePatches();
+  redrawCanvas();
+}
+
+function applyLinkStrokeEnabled(value) {
+  currentSettings.linkStrokeEnabled = Boolean(value);
   ensurePatches();
   redrawCanvas();
 }
@@ -721,6 +746,16 @@ const extension = {
       onChange: (value) => applyRerouteFlatFillMode(value)
     },
     {
+      id: SETTING_ID_REROUTE_STROKE_ENABLED,
+      category: makeKomlevvTweaksCategory("Link Style", "Reroute stroke enabled"),
+      name: "Reroute stroke enabled",
+      tooltip:
+        "Enables or disables reroute circle outer and inner stroke. Does not affect selected ring.",
+      type: "boolean",
+      defaultValue: DEFAULT_REROUTE_STROKE_ENABLED,
+      onChange: (value) => applyRerouteStrokeEnabled(value)
+    },
+    {
       id: SETTING_ID_LINK_WIDTH,
       category: makeKomlevvTweaksCategory("Link Style", "Link width"),
       name: "Link width",
@@ -759,6 +794,16 @@ const extension = {
       type: "color",
       defaultValue: DEFAULT_LINK_STROKE_COLOR,
       onChange: (value) => applyLinkStrokeColor(value)
+    },
+    {
+      id: SETTING_ID_LINK_STROKE_ENABLED,
+      category: makeKomlevvTweaksCategory("Link Style", "Link stroke enabled"),
+      name: "Link stroke enabled",
+      tooltip:
+        "Enables or disables link stroke rendering. Does not affect reroute selected ring.",
+      type: "boolean",
+      defaultValue: DEFAULT_LINK_STROKE_ENABLED,
+      onChange: (value) => applyLinkStrokeEnabled(value)
     }
   ],
   setup() {
