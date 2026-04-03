@@ -27,7 +27,7 @@ Current tweak groups:
 
 Link Style is the shared tweak group for link-related visual customization.
 
-Current settings:
+Current settings added by this tweak group:
 
 - `Reroute dot radius`
 
@@ -35,3 +35,5 @@ Current behavior:
 
 - Changes the size of the inline reroute point on links
 - Does not change the white Reroute node
+- Does not change link width or link stroke
+- Does not override ComfyUI low-quality zoom-out link rendering
