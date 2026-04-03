@@ -2,6 +2,17 @@
 
 A monorepo for personal ComfyUI tweaks, frontend extensions, custom nodes, and future utilities.
 
+## Disclaimer
+
+Tested on:
+
+- ComfyUI `0.18.2 Portable`
+- `ComfyUI_frontend v1.41.21`
+- `Templates v0.9.36`
+- `Edge 146.0.3`
+
+Use at your own risk.
+
 ## Install
 
 Clone this repo into your `ComfyUI/custom_nodes` folder, restart ComfyUI, then refresh the browser page.
