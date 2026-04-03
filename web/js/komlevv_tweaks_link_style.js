@@ -10,10 +10,6 @@ const SETTING_ID_REROUTE_INNER_STROKE_COLOR =
   "komlevv.tweaks.linkStyle.rerouteInnerStrokeColor";
 const SETTING_ID_REROUTE_SELECTED_RING_COLOR =
   "komlevv.tweaks.linkStyle.rerouteSelectedRingColor";
-const SETTING_ID_REROUTE_SELECTED_RING_STROKE_WIDTH =
-  "komlevv.tweaks.linkStyle.rerouteSelectedRingStrokeWidth";
-const SETTING_ID_REROUTE_FLAT_FILL_MODE =
-  "komlevv.tweaks.linkStyle.rerouteFlatFillMode";
 const SETTING_ID_LINK_WIDTH = "komlevv.tweaks.linkStyle.linkWidth";
 const SETTING_ID_LINK_STROKE_WIDTH = "komlevv.tweaks.linkStyle.linkStrokeWidth";
 const SETTING_ID_LINK_STROKE_COLOR = "komlevv.tweaks.linkStyle.linkStrokeColor";
@@ -28,10 +24,6 @@ const MAX_REROUTE_STROKE_WIDTH = 6;
 const DEFAULT_REROUTE_STROKE_COLOR = "000000";
 const DEFAULT_REROUTE_INNER_STROKE_COLOR = "000000";
 const DEFAULT_REROUTE_SELECTED_RING_COLOR = "ffffff";
-const DEFAULT_REROUTE_SELECTED_RING_STROKE_WIDTH = 0.6;
-const MIN_REROUTE_SELECTED_RING_STROKE_WIDTH = 0.1;
-const MAX_REROUTE_SELECTED_RING_STROKE_WIDTH = 6;
-const DEFAULT_REROUTE_FLAT_FILL_MODE = false;
 const DEFAULT_REROUTE_STROKE_OPACITY = 0.5;
 const DEFAULT_REROUTE_INNER_STROKE_OPACITY = 0.3;
 
@@ -55,8 +47,6 @@ const currentSettings = {
   rerouteStrokeColor: DEFAULT_REROUTE_STROKE_COLOR,
   rerouteInnerStrokeColor: DEFAULT_REROUTE_INNER_STROKE_COLOR,
   rerouteSelectedRingColor: DEFAULT_REROUTE_SELECTED_RING_COLOR,
-  rerouteSelectedRingStrokeWidth: DEFAULT_REROUTE_SELECTED_RING_STROKE_WIDTH,
-  rerouteFlatFillMode: DEFAULT_REROUTE_FLAT_FILL_MODE,
   linkWidth: DEFAULT_LINK_WIDTH,
   linkStrokeWidth: DEFAULT_LINK_STROKE_WIDTH,
   linkStrokeColor: DEFAULT_LINK_STROKE_COLOR
@@ -169,19 +159,6 @@ function getRerouteStrokePassType(strokeStyle) {
   return null;
 }
 
-function getRerouteFillPassType(fillStyle) {
-  const token = normalizeCanvasColorToken(fillStyle);
-  if (
-    token === "#ffffff55" ||
-    token === "rgba(255,255,255,0.3333333333333333)" ||
-    token === "rgba(255,255,255,0.33333333333333326)" ||
-    token === "rgba(255,255,255,0.33)"
-  ) {
-    return "innerHighlight";
-  }
-  return "baseFill";
-}
-
 function redrawCanvas() {
   app.canvas?.setDirty?.(true, true);
   app.graph?.setDirtyCanvas?.(true, true);
@@ -264,37 +241,9 @@ function ensureReroutePatch() {
     const RerouteClass = this?.constructor ?? patchState.rerouteClass;
     const defaultStrokeWidth = (RerouteClass?.radius ?? Reroute.radius) * 0.1;
     const originalStroke = ctx.stroke;
-    const originalFill = ctx.fill;
     if (typeof originalStroke !== "function") {
       return patchState.rerouteOriginalDraw.apply(this, args);
     }
-    if (typeof originalFill !== "function") {
-      return patchState.rerouteOriginalDraw.apply(this, args);
-    }
-
-    let lastBaseFillStyle = null;
-
-    ctx.fill = function (...fillArgs) {
-      const passType = getRerouteFillPassType(ctx.fillStyle);
-      const originalFillStyle = ctx.fillStyle;
-
-      if (
-        passType === "innerHighlight" &&
-        currentSettings.rerouteFlatFillMode &&
-        lastBaseFillStyle
-      ) {
-        ctx.fillStyle = lastBaseFillStyle;
-      }
-
-      try {
-        return originalFill.apply(this, fillArgs);
-      } finally {
-        if (passType === "baseFill") {
-          lastBaseFillStyle = originalFillStyle;
-        }
-        ctx.fillStyle = originalFillStyle;
-      }
-    };
 
     ctx.stroke = function (...strokeArgs) {
       const passType = getRerouteStrokePassType(ctx.strokeStyle);
@@ -312,9 +261,7 @@ function ensureReroutePatch() {
         ctx.strokeStyle = getRerouteSelectedRingColor();
       }
 
-      if (passType === "selected") {
-        ctx.lineWidth = currentSettings.rerouteSelectedRingStrokeWidth;
-      } else if (
+      if (
         Number.isFinite(ctx.lineWidth) &&
         Number.isFinite(defaultStrokeWidth) &&
         Math.abs(ctx.lineWidth - defaultStrokeWidth) < 0.000001
@@ -334,7 +281,6 @@ function ensureReroutePatch() {
       return patchState.rerouteOriginalDraw.apply(this, args);
     } finally {
       ctx.stroke = originalStroke;
-      ctx.fill = originalFill;
     }
   };
 }
@@ -486,23 +432,6 @@ function applyRerouteSelectedRingColor(value) {
   redrawCanvas();
 }
 
-function applyRerouteSelectedRingStrokeWidth(value) {
-  currentSettings.rerouteSelectedRingStrokeWidth = clampNumber(
-    value,
-    DEFAULT_REROUTE_SELECTED_RING_STROKE_WIDTH,
-    MIN_REROUTE_SELECTED_RING_STROKE_WIDTH,
-    MAX_REROUTE_SELECTED_RING_STROKE_WIDTH
-  );
-  ensurePatches();
-  redrawCanvas();
-}
-
-function applyRerouteFlatFillMode(value) {
-  currentSettings.rerouteFlatFillMode = Boolean(value);
-  ensurePatches();
-  redrawCanvas();
-}
-
 function applyLinkWidth(value) {
   currentSettings.linkWidth = clampInteger(
     value,
@@ -605,33 +534,6 @@ const extension = {
       type: "color",
       defaultValue: DEFAULT_REROUTE_SELECTED_RING_COLOR,
       onChange: (value) => applyRerouteSelectedRingColor(value)
-    },
-    {
-      id: SETTING_ID_REROUTE_SELECTED_RING_STROKE_WIDTH,
-      category: makeKomlevvTweaksCategory(
-        "Link Style",
-        "Reroute selected ring stroke width"
-      ),
-      name: "Reroute selected ring stroke width",
-      tooltip: "Changes stroke width of the selected inline reroute ring only.",
-      type: "slider",
-      attrs: {
-        min: MIN_REROUTE_SELECTED_RING_STROKE_WIDTH,
-        max: MAX_REROUTE_SELECTED_RING_STROKE_WIDTH,
-        step: 0.1
-      },
-      defaultValue: DEFAULT_REROUTE_SELECTED_RING_STROKE_WIDTH,
-      onChange: (value) => applyRerouteSelectedRingStrokeWidth(value)
-    },
-    {
-      id: SETTING_ID_REROUTE_FLAT_FILL_MODE,
-      category: makeKomlevvTweaksCategory("Link Style", "Reroute flat fill mode"),
-      name: "Reroute flat fill mode",
-      tooltip:
-        "Makes the inner reroute fill use the same color as the outer fill (removes glossy highlight).",
-      type: "boolean",
-      defaultValue: DEFAULT_REROUTE_FLAT_FILL_MODE,
-      onChange: (value) => applyRerouteFlatFillMode(value)
     },
     {
       id: SETTING_ID_LINK_WIDTH,

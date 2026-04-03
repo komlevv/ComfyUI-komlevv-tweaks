@@ -34,8 +34,6 @@ Current settings added by this tweak group:
 - `Reroute stroke color`
 - `Reroute inner stroke color`
 - `Reroute selected ring color`
-- `Reroute selected ring stroke width`
-- `Reroute flat fill mode`
 - `Link width`
 - `Link stroke width`
 - `Link stroke color`
@@ -47,8 +45,6 @@ Current behavior:
 - Changes inline reroute dot outer stroke color
 - Changes inline reroute dot inner stroke color
 - Changes inline reroute dot selected ring color
-- Changes inline reroute selected ring stroke width independently from other reroute strokes
-- Can switch reroute fill to flat mode (inner highlight uses same fill color as outer)
 - Changes normal-mode link width
 - Changes normal-mode link stroke width
 - Changes normal-mode link stroke color
