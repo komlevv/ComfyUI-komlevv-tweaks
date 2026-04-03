@@ -14,7 +14,7 @@ Custom settings from this repo live under:
 
 Current tweak groups:
 
-- `komlevv-tweaks > ComfyUI reroute dot size`
+- `komlevv-tweaks > Link Style`
 
 ## Repository layout
 
@@ -23,8 +23,15 @@ Current tweak groups:
 
 ## Included tweaks
 
-### ComfyUI reroute dot size
+### Link Style
 
-Changes the size of the inline reroute point on links.
+Link Style is the shared tweak group for link-related visual customization.
 
-It does not change the white Reroute node.
+Current settings:
+
+- `Reroute dot radius`
+
+Current behavior:
+
+- Changes the size of the inline reroute point on links
+- Does not change the white Reroute node
