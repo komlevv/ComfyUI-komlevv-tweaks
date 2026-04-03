@@ -22,17 +22,17 @@ const SETTING_ID_LINK_STROKE_COLOR = "komlevv.tweaks.linkStyle.linkStrokeColor";
 const SETTING_ID_LINK_STROKE_ENABLED =
   "komlevv.tweaks.linkStyle.linkStrokeEnabled";
 
-const DEFAULT_REROUTE_DOT_RADIUS = 6;
+const DEFAULT_REROUTE_DOT_RADIUS = 10;
 const MIN_REROUTE_DOT_RADIUS = 3;
 const MAX_REROUTE_DOT_RADIUS = 16;
 
-const DEFAULT_REROUTE_STROKE_WIDTH = 0.6;
+const DEFAULT_REROUTE_STROKE_WIDTH = 1.0;
 const MIN_REROUTE_STROKE_WIDTH = 0.1;
 const MAX_REROUTE_STROKE_WIDTH = 6;
 const DEFAULT_REROUTE_STROKE_COLOR = "000000";
 const DEFAULT_REROUTE_INNER_STROKE_COLOR = "000000";
 const DEFAULT_REROUTE_SELECTED_RING_COLOR = "ffffff";
-const DEFAULT_REROUTE_SELECTED_RING_STROKE_WIDTH = 0.6;
+const DEFAULT_REROUTE_SELECTED_RING_STROKE_WIDTH = 1.0;
 const MIN_REROUTE_SELECTED_RING_STROKE_WIDTH = 0.1;
 const MAX_REROUTE_SELECTED_RING_STROKE_WIDTH = 6;
 const DEFAULT_REROUTE_FLAT_FILL_MODE = false;
@@ -70,12 +70,6 @@ const currentSettings = {
   linkStrokeColor: DEFAULT_LINK_STROKE_COLOR,
   linkStrokeEnabled: DEFAULT_LINK_STROKE_ENABLED
 };
-
-function clampInteger(value, fallback, min, max) {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric)) return fallback;
-  return Math.min(max, Math.max(min, Math.round(numeric)));
-}
 
 function clampNumber(value, fallback, min, max) {
   const numeric = Number(value);
@@ -529,7 +523,7 @@ function ensurePatches() {
 }
 
 function applyRerouteDotRadius(value) {
-  currentSettings.rerouteDotRadius = clampInteger(
+  currentSettings.rerouteDotRadius = clampNumber(
     value,
     DEFAULT_REROUTE_DOT_RADIUS,
     MIN_REROUTE_DOT_RADIUS,
@@ -609,7 +603,7 @@ function applyRerouteStrokeEnabled(value) {
 }
 
 function applyLinkWidth(value) {
-  currentSettings.linkWidth = clampInteger(
+  currentSettings.linkWidth = clampNumber(
     value,
     DEFAULT_LINK_WIDTH,
     MIN_LINK_WIDTH,
@@ -621,7 +615,7 @@ function applyLinkWidth(value) {
 }
 
 function applyLinkStrokeWidth(value) {
-  currentSettings.linkStrokeWidth = clampInteger(
+  currentSettings.linkStrokeWidth = clampNumber(
     value,
     DEFAULT_LINK_STROKE_WIDTH,
     MIN_LINK_STROKE_WIDTH,
@@ -665,7 +659,7 @@ const extension = {
       attrs: {
         min: MIN_REROUTE_DOT_RADIUS,
         max: MAX_REROUTE_DOT_RADIUS,
-        step: 1
+        step: 0.1
       },
       defaultValue: DEFAULT_REROUTE_DOT_RADIUS,
       onChange: (value) => applyRerouteDotRadius(value)
@@ -765,7 +759,7 @@ const extension = {
       attrs: {
         min: MIN_LINK_WIDTH,
         max: MAX_LINK_WIDTH,
-        step: 1
+        step: 0.1
       },
       defaultValue: DEFAULT_LINK_WIDTH,
       onChange: (value) => applyLinkWidth(value)
@@ -780,7 +774,7 @@ const extension = {
       attrs: {
         min: MIN_LINK_STROKE_WIDTH,
         max: MAX_LINK_STROKE_WIDTH,
-        step: 1
+        step: 0.1
       },
       defaultValue: DEFAULT_LINK_STROKE_WIDTH,
       onChange: (value) => applyLinkStrokeWidth(value)
