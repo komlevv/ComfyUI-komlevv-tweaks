@@ -48,6 +48,7 @@ const DEFAULT_LINK_STROKE_OPACITY = 0.5;
 const DEFAULT_LINK_STROKE_RGBA = `rgba(0,0,0,${DEFAULT_LINK_STROKE_OPACITY})`;
 
 const PATCH_STATE_KEY = "__komlevvTweaksLinkStylePatchState";
+const COLOR_PICKER_BORDER_STYLE_ID = "komlevv-tweaks-color-picker-border-style";
 
 const currentSettings = {
   rerouteDotRadius: DEFAULT_REROUTE_DOT_RADIUS,
@@ -253,6 +254,23 @@ function getRerouteFillPassType(fillStyle) {
 function redrawCanvas() {
   app.canvas?.setDirty?.(true, true);
   app.graph?.setDirtyCanvas?.(true, true);
+}
+
+function ensureColorPickerBorderStyle() {
+  if (typeof document === "undefined") return;
+  if (document.getElementById(COLOR_PICKER_BORDER_STYLE_ID)) return;
+
+  const style = document.createElement("style");
+  style.id = COLOR_PICKER_BORDER_STYLE_ID;
+  style.textContent = `
+    .comfy-settings-dialog .p-colorpicker-preview,
+    .p-dialog .p-colorpicker-preview {
+      border: 1px solid var(--p-inputtext-border-color, var(--border-color, #b6c1cf));
+      box-sizing: border-box;
+    }
+  `;
+
+  document.head.append(style);
 }
 
 function getEffectiveLinkWidth(canvas) {
@@ -602,6 +620,7 @@ function applyLinkStrokeColor(value) {
 }
 
 function applyAllSettings() {
+  ensureColorPickerBorderStyle();
   ensurePatches();
   applyRerouteDotRadius(currentSettings.rerouteDotRadius);
   syncCurrentCanvasLinkWidth();

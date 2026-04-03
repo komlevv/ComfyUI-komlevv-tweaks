@@ -49,6 +49,7 @@ Current behavior:
 - Changes inline reroute dot selected ring color
 - Changes inline reroute selected ring stroke width independently from other reroute strokes
 - Can switch reroute fill to flat mode (inner highlight uses same fill color as outer)
+- Adds a theme-aware border around settings color preview swatches so white values stay visible on light palettes
 - Changes normal-mode link width
 - Changes normal-mode link stroke width
 - Changes normal-mode link stroke color
