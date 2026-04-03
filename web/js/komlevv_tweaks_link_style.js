@@ -154,15 +154,75 @@ function normalizeCanvasColorToken(value) {
     .toLowerCase();
 }
 
+function parseCanvasColorToken(value) {
+  const token = normalizeCanvasColorToken(value);
+
+  if (token.startsWith("#")) {
+    if (token.length === 4) {
+      const red = Number.parseInt(token[1] + token[1], 16);
+      const green = Number.parseInt(token[2] + token[2], 16);
+      const blue = Number.parseInt(token[3] + token[3], 16);
+      return { red, green, blue, alpha: 1 };
+    }
+
+    if (token.length === 7) {
+      const red = Number.parseInt(token.slice(1, 3), 16);
+      const green = Number.parseInt(token.slice(3, 5), 16);
+      const blue = Number.parseInt(token.slice(5, 7), 16);
+      return { red, green, blue, alpha: 1 };
+    }
+
+    if (token.length === 9) {
+      const red = Number.parseInt(token.slice(1, 3), 16);
+      const green = Number.parseInt(token.slice(3, 5), 16);
+      const blue = Number.parseInt(token.slice(5, 7), 16);
+      const alpha = Number.parseInt(token.slice(7, 9), 16) / 255;
+      return { red, green, blue, alpha };
+    }
+  }
+
+  const rgbMatch = token.match(/^rgba?\(([^)]+)\)$/);
+  if (!rgbMatch) return null;
+
+  const channels = rgbMatch[1].split(",");
+  if (channels.length < 3 || channels.length > 4) return null;
+
+  const red = Number(channels[0]);
+  const green = Number(channels[1]);
+  const blue = Number(channels[2]);
+  const alpha = channels.length === 4 ? Number(channels[3]) : 1;
+
+  if (![red, green, blue, alpha].every((channel) => Number.isFinite(channel))) {
+    return null;
+  }
+
+  return { red, green, blue, alpha };
+}
+
+function isApproxEqual(value, target, epsilon = 0.000001) {
+  return Math.abs(value - target) <= epsilon;
+}
+
 function getRerouteStrokePassType(strokeStyle) {
-  const token = normalizeCanvasColorToken(strokeStyle);
-  if (token === "rgb(0,0,0,0.5)" || token === "rgba(0,0,0,0.5)") {
+  const parsed = parseCanvasColorToken(strokeStyle);
+  if (!parsed) return null;
+
+  const { red, green, blue, alpha } = parsed;
+  const isBlack = red === 0 && green === 0 && blue === 0;
+  const isWhite = red === 255 && green === 255 && blue === 255;
+
+  if (isBlack && isApproxEqual(alpha, DEFAULT_REROUTE_STROKE_OPACITY, 0.02)) {
     return "outer";
   }
-  if (token === "rgb(0,0,0,0.3)" || token === "rgba(0,0,0,0.3)") {
+
+  if (
+    isBlack &&
+    isApproxEqual(alpha, DEFAULT_REROUTE_INNER_STROKE_OPACITY, 0.02)
+  ) {
     return "inner";
   }
-  if (token === "#fff" || token === "#ffffff" || token === "rgb(255,255,255)") {
+
+  if (isWhite && isApproxEqual(alpha, 1, 0.02)) {
     return "selected";
   }
 
@@ -170,15 +230,15 @@ function getRerouteStrokePassType(strokeStyle) {
 }
 
 function getRerouteFillPassType(fillStyle) {
-  const token = normalizeCanvasColorToken(fillStyle);
-  if (
-    token === "#ffffff55" ||
-    token === "rgba(255,255,255,0.3333333333333333)" ||
-    token === "rgba(255,255,255,0.33333333333333326)" ||
-    token === "rgba(255,255,255,0.33)"
-  ) {
+  const parsed = parseCanvasColorToken(fillStyle);
+  if (!parsed) return "baseFill";
+
+  const { red, green, blue, alpha } = parsed;
+  const isWhiteHighlight = red === 255 && green === 255 && blue === 255;
+  if (isWhiteHighlight && alpha > 0.25 && alpha < 0.45) {
     return "innerHighlight";
   }
+
   return "baseFill";
 }
 
