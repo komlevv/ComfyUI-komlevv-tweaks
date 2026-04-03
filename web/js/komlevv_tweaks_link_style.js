@@ -2,7 +2,6 @@ import { app } from "../../scripts/app.js";
 import { makeKomlevvTweaksCategory } from "./komlevv_tweaks_common.js";
 
 const EXTENSION_ID = "komlevv.tweaks.linkStyle";
-const SETTINGS_CATEGORY = makeKomlevvTweaksCategory("Link Style");
 
 const SETTING_ID_REROUTE_DOT_RADIUS = "komlevv.tweaks.linkStyle.rerouteDotRadius";
 const SETTING_ID_LINK_WIDTH = "komlevv.tweaks.linkStyle.linkWidth";
@@ -301,7 +300,7 @@ const extension = {
   settings: [
     {
       id: SETTING_ID_REROUTE_DOT_RADIUS,
-      category: SETTINGS_CATEGORY,
+      category: makeKomlevvTweaksCategory("Link Style", "Reroute dot radius"),
       name: "Reroute dot radius",
       tooltip:
         "Changes the size of the inline reroute point on a link. Does not affect the white Reroute node.",
@@ -316,7 +315,7 @@ const extension = {
     },
     {
       id: SETTING_ID_LINK_WIDTH,
-      category: SETTINGS_CATEGORY,
+      category: makeKomlevvTweaksCategory("Link Style", "Link width"),
       name: "Link width",
       tooltip:
         "Changes link width in normal rendering mode. ComfyUI low-quality zoom-out rendering is left unchanged.",
@@ -331,7 +330,7 @@ const extension = {
     },
     {
       id: SETTING_ID_LINK_STROKE_WIDTH,
-      category: SETTINGS_CATEGORY,
+      category: makeKomlevvTweaksCategory("Link Style", "Link stroke width"),
       name: "Link stroke width",
       tooltip:
         "Changes link stroke width in normal rendering mode. ComfyUI low-quality zoom-out rendering is left unchanged.",
@@ -346,7 +345,7 @@ const extension = {
     },
     {
       id: SETTING_ID_LINK_STROKE_COLOR,
-      category: SETTINGS_CATEGORY,
+      category: makeKomlevvTweaksCategory("Link Style", "Link stroke color"),
       name: "Link stroke color",
       tooltip:
         "Changes link stroke color in normal rendering mode. ComfyUI low-quality zoom-out rendering is left unchanged.",
