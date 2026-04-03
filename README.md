@@ -30,10 +30,19 @@ Link Style is the shared tweak group for link-related visual customization.
 Current settings added by this tweak group:
 
 - `Reroute dot radius`
+- `Link width`
+- `Link stroke width`
+- `Link stroke color`
 
 Current behavior:
 
 - Changes the size of the inline reroute point on links
+- Changes normal-mode link width
+- Changes normal-mode link stroke width
+- Changes normal-mode link stroke color
 - Does not change the white Reroute node
-- Does not change link width or link stroke
 - Does not override ComfyUI low-quality zoom-out link rendering
+
+Notes:
+
+- `Link stroke color` uses the chosen color with a fixed semi-transparent stroke so the default ComfyUI look stays close to stock.
