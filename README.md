@@ -27,6 +27,7 @@ Current tweak groups:
 
 - `komlevv-tweaks > Canvas Style`
 - `komlevv-tweaks > Link Style`
+- `komlevv-tweaks > Node Colors`
 
 ## Repository layout
 
@@ -90,3 +91,32 @@ Current behavior:
 Notes:
 
 - `Link stroke color` uses the chosen color with a fixed semi-transparent stroke so the default ComfyUI look stays close to stock.
+
+### Node Colors
+
+Node Colors is the tweak group for overriding built-in LiteGraph color presets.
+
+Current settings added by this tweak group:
+
+- Separate `Title color`, `Background color`, and `Group color` pickers for every built-in preset:
+  - `Red`
+  - `Brown`
+  - `Green`
+  - `Blue`
+  - `Pale blue`
+  - `Cyan`
+  - `Purple`
+  - `Yellow`
+  - `Black`
+
+Current behavior:
+
+- Overrides built-in `LiteGraph.LGraphCanvas.node_colors` presets
+- Keeps preset fields fully manual instead of auto-deriving colors
+- Updates existing nodes and groups when they still match the previous preset values
+- Adds a theme-aware border around settings color preview swatches so white values stay visible on light palettes
+
+Commands:
+
+- `Reset Node Colors: all presets to stock`
+- `Reset Node Colors: <Preset> preset to stock`

@@ -257,6 +257,24 @@ function applyNodeColors() {
   redrawCanvas();
 }
 
+function setPresetToValues(presetKey, values) {
+  for (const field of PRESET_FIELDS) {
+    currentSettings[presetKey][field] = normalizeHexColor(values[field]);
+  }
+}
+
+function resetPresetToStock(presetKey) {
+  setPresetToValues(presetKey, BUILTIN_PRESET_DEFAULTS[presetKey]);
+  applyNodeColors();
+}
+
+function resetAllPresetsToStock() {
+  for (const presetKey of BUILTIN_PRESET_KEYS) {
+    setPresetToValues(presetKey, BUILTIN_PRESET_DEFAULTS[presetKey]);
+  }
+  applyNodeColors();
+}
+
 function applyPresetSetting(presetKey, field, value) {
   const fallback = normalizeHexColor(BUILTIN_PRESET_DEFAULTS[presetKey][field]);
   currentSettings[presetKey][field] = normalizeHexColor(value, fallback);
@@ -271,11 +289,21 @@ function createPresetFieldSetting(presetKey, field) {
   return {
     id: `komlevv.tweaks.nodeColors.${presetKey}.${field}`,
     category: makeKomlevvTweaksCategory("Node Colors", `${label} / ${fieldLabel}`),
-    name: fieldLabel,
+    name: `${label} / ${fieldLabel}`,
     tooltip: `Changes the ${fieldLabel.toLowerCase()} for the built-in ${label.toLowerCase()} LiteGraph preset.`,
     type: "color",
     defaultValue,
     onChange: (value) => applyPresetSetting(presetKey, field, value)
+  };
+}
+
+function createResetPresetCommand(presetKey) {
+  const label = PRESET_LABELS[presetKey];
+
+  return {
+    id: `komlevv.tweaks.nodeColors.reset.${presetKey}`,
+    label: `Reset Node Colors: ${label} preset to stock`,
+    function: () => resetPresetToStock(presetKey)
   };
 }
 
@@ -288,6 +316,14 @@ const extension = {
   settings: BUILTIN_PRESET_KEYS.flatMap((presetKey) =>
     PRESET_FIELDS.map((field) => createPresetFieldSetting(presetKey, field))
   ),
+  commands: [
+    {
+      id: "komlevv.tweaks.nodeColors.reset.all",
+      label: "Reset Node Colors: all presets to stock",
+      function: () => resetAllPresetsToStock()
+    },
+    ...BUILTIN_PRESET_KEYS.map((presetKey) => createResetPresetCommand(presetKey))
+  ],
   setup() {
     applyAllSettings();
   },
