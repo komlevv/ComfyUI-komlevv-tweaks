@@ -98,6 +98,8 @@ Node Colors is the tweak group for overriding built-in LiteGraph color presets.
 
 Current settings added by this tweak group:
 
+- `Reset all presets to stock now`
+- `Reset <Preset> preset to stock now`
 - Separate `Title color`, `Background color`, and `Group color` pickers for every built-in preset:
   - `Red`
   - `Brown`
@@ -113,6 +115,7 @@ Current behavior:
 
 - Overrides built-in `LiteGraph.LGraphCanvas.node_colors` presets
 - Keeps preset fields fully manual instead of auto-deriving colors
+- Tries to normalize color picker values from multiple formats before applying them
 - Updates existing nodes and groups when they still match the previous preset values
 - Adds a theme-aware border around settings color preview swatches so white values stay visible on light palettes
 

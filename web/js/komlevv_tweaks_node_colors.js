@@ -48,30 +48,7 @@ const BUILTIN_PRESET_DEFAULTS = Object.freeze({
 });
 
 const PRESET_FIELDS = ["color", "bgcolor", "groupcolor"];
-
-function normalizeHexColor(value, fallback = "000000") {
-  const normalized = String(value ?? "")
-    .trim()
-    .replace(/^#/, "")
-    .toLowerCase();
-
-  if (/^[0-9a-f]{6}$/.test(normalized)) {
-    return normalized;
-  }
-
-  if (/^[0-9a-f]{3}$/.test(normalized)) {
-    return normalized
-      .split("")
-      .map((channel) => channel + channel)
-      .join("");
-  }
-
-  return fallback;
-}
-
-function normalizeCanvasHexColor(value, fallback = "000000") {
-  return `#${normalizeHexColor(value, fallback)}`;
-}
+const RESET_ALL_SETTING_ID = "komlevv.tweaks.nodeColors.resetAllNow";
 
 const currentSettings = Object.fromEntries(
   BUILTIN_PRESET_KEYS.map((presetKey) => [
@@ -79,7 +56,7 @@ const currentSettings = Object.fromEntries(
     Object.fromEntries(
       PRESET_FIELDS.map((field) => [
         field,
-        normalizeHexColor(BUILTIN_PRESET_DEFAULTS[presetKey][field])
+        "000000"
       ])
     )
   ])
@@ -104,6 +81,119 @@ function getCurrentCanvas() {
 
 function getGraph() {
   return app.graph ?? getCurrentCanvas()?.graph ?? null;
+}
+
+function getSettingStore() {
+  return app.extensionManager?.setting ?? null;
+}
+
+function getSettingId(presetKey, field) {
+  return `komlevv.tweaks.nodeColors.${presetKey}.${field}`;
+}
+
+function getResetPresetSettingId(presetKey) {
+  return `komlevv.tweaks.nodeColors.reset.${presetKey}`;
+}
+
+function getStoredSettingValue(settingId, fallback) {
+  const store = getSettingStore();
+  if (!store?.get) return fallback;
+
+  try {
+    const value = store.get(settingId);
+    return value ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function setStoredSettingValue(settingId, value) {
+  const store = getSettingStore();
+  if (!store?.set) return;
+
+  try {
+    store.set(settingId, value);
+  } catch {
+    // ignore
+  }
+}
+
+function clampColorChannel(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return Math.max(0, Math.min(255, Math.round(numeric)));
+}
+
+function rgbChannelsToHex(red, green, blue) {
+  const channels = [red, green, blue].map((value) => clampColorChannel(value));
+  if (channels.some((value) => value == null)) return null;
+
+  return channels
+    .map((value) => value.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function normalizeHexColor(value, fallback = "000000") {
+  if (typeof value === "string") {
+    const normalized = value.trim().replace(/^#/, "").toLowerCase();
+
+    if (/^[0-9a-f]{3}$/.test(normalized)) {
+      return normalized
+        .split("")
+        .map((channel) => channel + channel)
+        .join("");
+    }
+
+    if (/^[0-9a-f]{4}$/.test(normalized)) {
+      return normalized
+        .slice(0, 3)
+        .split("")
+        .map((channel) => channel + channel)
+        .join("");
+    }
+
+    if (/^[0-9a-f]{6}$/.test(normalized)) {
+      return normalized;
+    }
+
+    if (/^[0-9a-f]{8}$/.test(normalized)) {
+      return normalized.slice(0, 6);
+    }
+
+    const rgbMatch = normalized.match(/^rgba?\(([^)]+)\)$/);
+    if (rgbMatch) {
+      const channels = rgbMatch[1].split(",").map((part) => part.trim());
+      const rgbHex = rgbChannelsToHex(channels[0], channels[1], channels[2]);
+      if (rgbHex) return rgbHex;
+    }
+  }
+
+  if (Array.isArray(value) && value.length >= 3) {
+    const rgbHex = rgbChannelsToHex(value[0], value[1], value[2]);
+    if (rgbHex) return rgbHex;
+  }
+
+  if (value && typeof value === "object") {
+    const candidateKeys = ["hex", "value", "color"];
+    for (const key of candidateKeys) {
+      if (typeof value[key] === "string") {
+        return normalizeHexColor(value[key], fallback);
+      }
+    }
+
+    const rgbHex = rgbChannelsToHex(
+      value.r ?? value.red,
+      value.g ?? value.green,
+      value.b ?? value.blue
+    );
+    if (rgbHex) return rgbHex;
+  }
+
+  return normalizeHexColor(fallback, "000000");
+}
+
+function normalizeCanvasHexColor(value, fallback = "000000") {
+  return `#${normalizeHexColor(value, fallback)}`;
 }
 
 function redrawCanvas() {
@@ -156,6 +246,18 @@ function ensureOriginalNodeColors() {
 
   patchState.originalNodeColors = cloneNodeColors(LGraphCanvas.node_colors);
   return patchState.originalNodeColors;
+}
+
+function loadSavedSettingsIntoCurrentState() {
+  for (const presetKey of BUILTIN_PRESET_KEYS) {
+    for (const field of PRESET_FIELDS) {
+      const defaultValue = normalizeHexColor(BUILTIN_PRESET_DEFAULTS[presetKey][field]);
+      currentSettings[presetKey][field] = normalizeHexColor(
+        getStoredSettingValue(getSettingId(presetKey, field), defaultValue),
+        defaultValue
+      );
+    }
+  }
 }
 
 function buildNodeColorOverrides(baseNodeColors) {
@@ -257,20 +359,25 @@ function applyNodeColors() {
   redrawCanvas();
 }
 
-function setPresetToValues(presetKey, values) {
+function setPresetToValues(presetKey, values, syncStoredSettings = false) {
   for (const field of PRESET_FIELDS) {
-    currentSettings[presetKey][field] = normalizeHexColor(values[field]);
+    const normalized = normalizeHexColor(values[field], normalizeHexColor(BUILTIN_PRESET_DEFAULTS[presetKey][field]));
+    currentSettings[presetKey][field] = normalized;
+
+    if (syncStoredSettings) {
+      setStoredSettingValue(getSettingId(presetKey, field), normalized);
+    }
   }
 }
 
-function resetPresetToStock(presetKey) {
-  setPresetToValues(presetKey, BUILTIN_PRESET_DEFAULTS[presetKey]);
+function resetPresetToStock(presetKey, syncStoredSettings = true) {
+  setPresetToValues(presetKey, BUILTIN_PRESET_DEFAULTS[presetKey], syncStoredSettings);
   applyNodeColors();
 }
 
-function resetAllPresetsToStock() {
+function resetAllPresetsToStock(syncStoredSettings = true) {
   for (const presetKey of BUILTIN_PRESET_KEYS) {
-    setPresetToValues(presetKey, BUILTIN_PRESET_DEFAULTS[presetKey]);
+    setPresetToValues(presetKey, BUILTIN_PRESET_DEFAULTS[presetKey], syncStoredSettings);
   }
   applyNodeColors();
 }
@@ -287,7 +394,7 @@ function createPresetFieldSetting(presetKey, field) {
   const defaultValue = normalizeHexColor(BUILTIN_PRESET_DEFAULTS[presetKey][field]);
 
   return {
-    id: `komlevv.tweaks.nodeColors.${presetKey}.${field}`,
+    id: getSettingId(presetKey, field),
     category: makeKomlevvTweaksCategory("Node Colors", `${label} / ${fieldLabel}`),
     name: `${label} / ${fieldLabel}`,
     tooltip: `Changes the ${fieldLabel.toLowerCase()} for the built-in ${label.toLowerCase()} LiteGraph preset.`,
@@ -297,30 +404,70 @@ function createPresetFieldSetting(presetKey, field) {
   };
 }
 
+function createResetPresetSetting(presetKey) {
+  const label = PRESET_LABELS[presetKey];
+  const settingId = getResetPresetSettingId(presetKey);
+
+  return {
+    id: settingId,
+    category: makeKomlevvTweaksCategory("Node Colors", `${label} / Reset to stock`),
+    name: `Reset ${label} preset to stock now`,
+    tooltip: `Immediately restores all ${label.toLowerCase()} preset colors to the built-in LiteGraph defaults.`,
+    type: "boolean",
+    defaultValue: false,
+    onChange: (value) => {
+      if (!value) return;
+      resetPresetToStock(presetKey, true);
+      setStoredSettingValue(settingId, false);
+    }
+  };
+}
+
+function createResetAllSetting() {
+  return {
+    id: RESET_ALL_SETTING_ID,
+    category: makeKomlevvTweaksCategory("Node Colors", "Reset all presets to stock"),
+    name: "Reset all presets to stock now",
+    tooltip: "Immediately restores all built-in LiteGraph presets to their stock colors.",
+    type: "boolean",
+    defaultValue: false,
+    onChange: (value) => {
+      if (!value) return;
+      resetAllPresetsToStock(true);
+      setStoredSettingValue(RESET_ALL_SETTING_ID, false);
+    }
+  };
+}
+
 function createResetPresetCommand(presetKey) {
   const label = PRESET_LABELS[presetKey];
 
   return {
     id: `komlevv.tweaks.nodeColors.reset.${presetKey}`,
     label: `Reset Node Colors: ${label} preset to stock`,
-    function: () => resetPresetToStock(presetKey)
+    function: () => resetPresetToStock(presetKey, true)
   };
 }
 
 function applyAllSettings() {
+  loadSavedSettingsIntoCurrentState();
   applyNodeColors();
 }
 
 const extension = {
   name: EXTENSION_ID,
-  settings: BUILTIN_PRESET_KEYS.flatMap((presetKey) =>
-    PRESET_FIELDS.map((field) => createPresetFieldSetting(presetKey, field))
-  ),
+  settings: [
+    createResetAllSetting(),
+    ...BUILTIN_PRESET_KEYS.flatMap((presetKey) => [
+      createResetPresetSetting(presetKey),
+      ...PRESET_FIELDS.map((field) => createPresetFieldSetting(presetKey, field))
+    ])
+  ],
   commands: [
     {
       id: "komlevv.tweaks.nodeColors.reset.all",
       label: "Reset Node Colors: all presets to stock",
-      function: () => resetAllPresetsToStock()
+      function: () => resetAllPresetsToStock(true)
     },
     ...BUILTIN_PRESET_KEYS.map((presetKey) => createResetPresetCommand(presetKey))
   ],
