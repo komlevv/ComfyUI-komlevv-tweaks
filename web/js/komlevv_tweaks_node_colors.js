@@ -65,7 +65,8 @@ const currentSettings = Object.fromEntries(
 function getPatchState() {
   if (!globalThis[PATCH_STATE_KEY]) {
     globalThis[PATCH_STATE_KEY] = {
-      originalNodeColors: null,
+      originalNodeColorsByTheme: new Map(),
+      activeThemeSignature: null,
       lastAppliedNodeColors: null
     };
   }
@@ -196,6 +197,111 @@ function normalizeCanvasHexColor(value, fallback = "000000") {
   return `#${normalizeHexColor(value, fallback)}`;
 }
 
+function clampUnit(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.min(1, numeric));
+}
+
+function hexToRgbUnit(hex) {
+  const normalized = normalizeHexColor(hex, "000000");
+  return {
+    r: parseInt(normalized.slice(0, 2), 16) / 255,
+    g: parseInt(normalized.slice(2, 4), 16) / 255,
+    b: parseInt(normalized.slice(4, 6), 16) / 255
+  };
+}
+
+function rgbUnitToHex({ r, g, b }) {
+  return [r, g, b]
+    .map((value) =>
+      Math.round(clampUnit(value) * 255)
+        .toString(16)
+        .padStart(2, "0")
+    )
+    .join("");
+}
+
+function rgbUnitToHsl({ r, g, b }) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const lightness = (max + min) / 2;
+
+  if (max === min) {
+    return { h: 0, s: 0, l: lightness };
+  }
+
+  const delta = max - min;
+  const saturation =
+    lightness > 0.5
+      ? delta / (2 - max - min)
+      : delta / (max + min);
+
+  let hue = 0;
+  switch (max) {
+    case r:
+      hue = (g - b) / delta + (g < b ? 6 : 0);
+      break;
+    case g:
+      hue = (b - r) / delta + 2;
+      break;
+    default:
+      hue = (r - g) / delta + 4;
+      break;
+  }
+
+  hue /= 6;
+  return { h: hue, s: saturation, l: lightness };
+}
+
+function hueToRgbUnit(p, q, t) {
+  let value = t;
+  if (value < 0) value += 1;
+  if (value > 1) value -= 1;
+  if (value < 1 / 6) return p + (q - p) * 6 * value;
+  if (value < 1 / 2) return q;
+  if (value < 2 / 3) return p + (q - p) * (2 / 3 - value) * 6;
+  return p;
+}
+
+function hslToRgbUnit({ h, s, l }) {
+  if (s === 0) {
+    return { r: l, g: l, b: l };
+  }
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+
+  return {
+    r: hueToRgbUnit(p, q, h + 1 / 3),
+    g: hueToRgbUnit(p, q, h),
+    b: hueToRgbUnit(p, q, h - 1 / 3)
+  };
+}
+
+function getNodeLightnessCompensation() {
+  const value = Number(globalThis?.LiteGraph?.nodeLightness ?? 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function compensateHexForRendererLightness(value, fallback = "000000") {
+  const normalized = normalizeHexColor(value, fallback);
+  const lightnessDelta = getNodeLightnessCompensation();
+
+  if (Math.abs(lightnessDelta) < 1e-6) {
+    return `#${normalized}`;
+  }
+
+  const hsl = rgbUnitToHsl(hexToRgbUnit(normalized));
+  const compensated = {
+    h: hsl.h,
+    s: hsl.s,
+    l: clampUnit(hsl.l - lightnessDelta)
+  };
+
+  return `#${rgbUnitToHex(hslToRgbUnit(compensated))}`;
+}
+
 function redrawCanvas() {
   app.canvas?.setDirty?.(true, true);
   app.graph?.setDirtyCanvas?.(true, true);
@@ -237,21 +343,61 @@ function getLiteGraphCanvasClass() {
   return globalThis?.LiteGraph?.LGraphCanvas ?? null;
 }
 
+function getThemeSignature() {
+  const store = getSettingStore();
+  let paletteId = "unknown";
+
+  try {
+    const storedPaletteId = store?.get?.("Comfy.ColorPalette");
+    if (storedPaletteId != null && storedPaletteId !== "") {
+      paletteId = String(storedPaletteId);
+    }
+  } catch {
+    // ignore
+  }
+
+  const lightness = Number(globalThis?.LiteGraph?.nodeLightness ?? 0);
+  const opacity = Number(globalThis?.LiteGraph?.nodeOpacity ?? 1);
+
+  return `${paletteId}::lightness=${Number.isFinite(lightness) ? lightness : 0}::opacity=${Number.isFinite(opacity) ? opacity : 1}`;
+}
+
 function ensureOriginalNodeColors() {
   const patchState = getPatchState();
-  if (patchState.originalNodeColors) return patchState.originalNodeColors;
-
   const LGraphCanvas = getLiteGraphCanvasClass();
   if (!LGraphCanvas?.node_colors) return null;
 
-  patchState.originalNodeColors = cloneNodeColors(LGraphCanvas.node_colors);
-  return patchState.originalNodeColors;
+  const themeSignature = getThemeSignature();
+  patchState.activeThemeSignature = themeSignature;
+
+  const existingSnapshot =
+    patchState.originalNodeColorsByTheme?.get?.(themeSignature) ?? null;
+
+  if (existingSnapshot) {
+    return existingSnapshot;
+  }
+
+  const snapshot = cloneNodeColors(LGraphCanvas.node_colors);
+  patchState.originalNodeColorsByTheme.set(themeSignature, snapshot);
+  return snapshot;
+}
+
+function getThemeStockPreset(presetKey) {
+  const originalNodeColors = ensureOriginalNodeColors();
+  return originalNodeColors?.[presetKey] ?? BUILTIN_PRESET_DEFAULTS[presetKey];
+}
+
+function getThemeStockPresetField(presetKey, field) {
+  return normalizeHexColor(
+    getThemeStockPreset(presetKey)?.[field],
+    normalizeHexColor(BUILTIN_PRESET_DEFAULTS[presetKey][field])
+  );
 }
 
 function loadSavedSettingsIntoCurrentState() {
   for (const presetKey of BUILTIN_PRESET_KEYS) {
     for (const field of PRESET_FIELDS) {
-      const defaultValue = normalizeHexColor(BUILTIN_PRESET_DEFAULTS[presetKey][field]);
+      const defaultValue = getThemeStockPresetField(presetKey, field);
       currentSettings[presetKey][field] = normalizeHexColor(
         getStoredSettingValue(getSettingId(presetKey, field), defaultValue),
         defaultValue
@@ -270,15 +416,15 @@ function buildNodeColorOverrides(baseNodeColors) {
       return [
         presetKey,
         {
-          color: normalizeCanvasHexColor(
+          color: compensateHexForRendererLightness(
             currentSettings[presetKey].color,
             normalizeHexColor(sourcePreset.color)
           ),
-          bgcolor: normalizeCanvasHexColor(
+          bgcolor: compensateHexForRendererLightness(
             currentSettings[presetKey].bgcolor,
             normalizeHexColor(sourcePreset.bgcolor)
           ),
-          groupcolor: normalizeCanvasHexColor(
+          groupcolor: compensateHexForRendererLightness(
             currentSettings[presetKey].groupcolor,
             normalizeHexColor(sourcePreset.groupcolor)
           )
@@ -361,7 +507,10 @@ function applyNodeColors() {
 
 function setPresetToValues(presetKey, values, syncStoredSettings = false) {
   for (const field of PRESET_FIELDS) {
-    const normalized = normalizeHexColor(values[field], normalizeHexColor(BUILTIN_PRESET_DEFAULTS[presetKey][field]));
+    const normalized = normalizeHexColor(
+      values?.[field],
+      getThemeStockPresetField(presetKey, field)
+    );
     currentSettings[presetKey][field] = normalized;
 
     if (syncStoredSettings) {
@@ -371,19 +520,19 @@ function setPresetToValues(presetKey, values, syncStoredSettings = false) {
 }
 
 function resetPresetToStock(presetKey, syncStoredSettings = true) {
-  setPresetToValues(presetKey, BUILTIN_PRESET_DEFAULTS[presetKey], syncStoredSettings);
+  setPresetToValues(presetKey, getThemeStockPreset(presetKey), syncStoredSettings);
   applyNodeColors();
 }
 
 function resetAllPresetsToStock(syncStoredSettings = true) {
   for (const presetKey of BUILTIN_PRESET_KEYS) {
-    setPresetToValues(presetKey, BUILTIN_PRESET_DEFAULTS[presetKey], syncStoredSettings);
+    setPresetToValues(presetKey, getThemeStockPreset(presetKey), syncStoredSettings);
   }
   applyNodeColors();
 }
 
 function applyPresetSetting(presetKey, field, value) {
-  const fallback = normalizeHexColor(BUILTIN_PRESET_DEFAULTS[presetKey][field]);
+  const fallback = getThemeStockPresetField(presetKey, field);
   currentSettings[presetKey][field] = normalizeHexColor(value, fallback);
   applyNodeColors();
 }
@@ -391,7 +540,7 @@ function applyPresetSetting(presetKey, field, value) {
 function createPresetFieldSetting(presetKey, field) {
   const label = PRESET_LABELS[presetKey];
   const fieldLabel = PRESET_FIELD_LABELS[field];
-  const defaultValue = normalizeHexColor(BUILTIN_PRESET_DEFAULTS[presetKey][field]);
+  const defaultValue = getThemeStockPresetField(presetKey, field);
 
   return {
     id: getSettingId(presetKey, field),
