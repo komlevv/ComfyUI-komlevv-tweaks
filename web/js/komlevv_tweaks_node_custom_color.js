@@ -52,6 +52,130 @@ function normalizePickerValue(value, fallback = "#000000") {
   return normalizePickerValue(fallback, "#000000");
 }
 
+function clampUnit(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return 0;
+  return Math.max(0, Math.min(1, numeric));
+}
+
+function hexToRgbUnit(hex) {
+  const normalized = normalizePickerValue(hex, "#000000").slice(1);
+  return {
+    r: parseInt(normalized.slice(0, 2), 16) / 255,
+    g: parseInt(normalized.slice(2, 4), 16) / 255,
+    b: parseInt(normalized.slice(4, 6), 16) / 255
+  };
+}
+
+function rgbUnitToHex({ r, g, b }) {
+  return `#${+r, g, b]
+    .map(
+      (value) =>
+        Math.round(clampUnit(value) * 255)
+          .toString(16)
+          .padStart(2, "0")
+    )
+    .join("")}`;
+}
+
+function rgbUnitToHsl({ r, g, b }) {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const lightness = (max + min) / 2;
+
+  if (max === min) {
+    return { h: 0, s: 0, l: lightness };
+  }
+
+  const delta = max - min;
+  const saturation =
+    lightness > 0.5
+      ? delta / (2 - max - min)
+      : delta / (max + min);
+
+  let hue = 0;
+  switch (max) {
+    case r:
+      hue = (g - b) / delta + (g < b ? 6 : 0);
+      break;
+    case g:
+      hue = (b - r) / delta + 2;
+      break;
+    default:
+      hue = (r - g) / delta + 4;
+      break;
+  }
+
+  hue /= 6;
+  return { h: hue, s: saturation, l: lightness };
+}
+
+function hueToRgbUnit(p, q, t) {
+  let value = t;
+  if (value < 0) value += 1;
+  if (value > 1) value -= 1;
+  if (value < 1 / 6) return p + (q - p) * 6 * value;
+  if (value < 1 / 2) return q;
+  if (value < 2 / 3) return p + (q - p) * (2 / 3 - value) * 6;
+  return p;
+}
+
+function hslToRgbUnit({ h, s, l }) {
+  if (s === 0) {
+    return { r: l, g: l, b: l };
+  }
+
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+
+  return {
+    r: hueToRgbUnit(p, q, h + 1 / 3),
+    g: hueToRgbUnit(p, q, h),
+    b: hueToRgbUnit(p, q, h - 1 / 3)
+  };
+}
+
+function getNodeLightnessCompensation() {
+  const value = Number(globalThis?.LiteGraph?.nodeLightness ?? 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function compensateHexForRendererLightness(value, fallback = "#000000") {
+  const normalized = normalizePickerValue(value, fallback);
+  const lightnessDelta = getNodeLightnessCompensation();
+
+  if (Math.abs(lightnessDelta) < 1e-6) {
+    return normalized;
+  }
+
+  const hsl = rgbUnitToHsl(hexToRgbUnit(normalized));
+  const compensated = {
+    h: hsl.h,
+    s: hsl.s,
+    l: clampUnit(hsl.l - lightnessDelta)
+  };
+
+  return rgbUnitToHex(hslToRgbUnit(compensated));
+}
+
+function applyRendererLightnessToHex(value, fallback = "#000000") {
+  const normalized = normalizePickerValue(value, fallback);
+  const lightnessDelta = getNodeLightnessCompensation();
+
+  if (Math.abs(lightnessDelta) < 1e-6) {
+    return normalized;
+  }
+
+  const hsl = rgbUnitToHsl(hexToRgbUnit(normalized));
+  const adjusted = {
+    h: hsl.h,
+    s: hsl.s,
+    l: clampUnit(hsl.l + lightnessDelta)
+  };
+
+  return rgbUnitToHex(hslToRgbUnit(adjusted));
+}
+
 function redrawCanvas() {
   app.canvas?.setDirty?.(true, true);
   app.graph?.setDirtyCanvas?.(true, true);
@@ -70,8 +194,15 @@ function applyColorToNode(node, pickerValue) {
   if (node.constructor === LiteGraph.LGraphGroup) {
     node.color = pickerValue;
   } else {
-    node.color = colorShade(pickerValue, 20);
-    node.bgcolor = pickerValue;
+    const shadedTitleColor = colorShade(pickerValue, 20);
+    node.color = compensateHexForRendererLightness(
+      shadedTitleColor,
+      shadedTitleColor
+    );
+    node.bgcolor = compensateHexForRendererLightness(
+      pickerValue,
+      pickerValue
+    );
   }
 }
 
@@ -130,7 +261,9 @@ app.registerExtension({
 
                   activeNode = null;
                   picker.value = normalizePickerValue(
-                    node?.constructor === LiteGraph.LGraphGroup ? node?.color : node?.bgcolor,
+                    node?.constructor === LiteGraph.LGraphGroup
+                      ? node?.color
+                      : applyRendererLightnessToHex(node?.bgcolor, "#000000"),
                     "#000000"
                   );
                   activeNode = node;
