@@ -68,14 +68,16 @@ function hexToRgbUnit(hex) {
 }
 
 function rgbUnitToHex({ r, g, b }) {
-  return `#${+r, g, b]
-    .map(
-      (value) =>
+  return (
+    "#" +
+    [r, g, b]
+      .map((value) =>
         Math.round(clampUnit(value) * 255)
           .toString(16)
           .padStart(2, "0")
-    )
-    .join("")}`;
+      )
+      .join("")
+  );
 }
 
 function rgbUnitToHsl({ r, g, b }) {
