@@ -67,6 +67,7 @@ function getPatchState() {
     globalThis[PATCH_STATE_KEY] = {
       originalNodeColorsByTheme: new Map(),
       activeThemeSignature: null,
+      lastAppliedThemeSignature: null,
       lastAppliedNodeColors: null
     };
   }
@@ -134,6 +135,74 @@ function rgbChannelsToHex(red, green, blue) {
     .join("");
 }
 
+function normalizeHue(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+
+  const normalized =
+    Math.abs(numeric) <= 1
+      ? numeric * 360
+      : numeric;
+
+  return ((normalized % 360) + 360) % 360;
+}
+
+function normalizeColorPercentage(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return null;
+
+  const normalized =
+    Math.abs(numeric) <= 1
+      ? numeric * 100
+      : numeric;
+
+  return Math.max(0, Math.min(100, normalized));
+}
+
+function hsvLikeToHex(hueValue, saturationValue, valueValue) {
+  const hue = normalizeHue(hueValue);
+  const saturation = normalizeColorPercentage(saturationValue);
+  const brightness = normalizeColorPercentage(valueValue);
+
+  if (hue == null || saturation == null || brightness == null) return null;
+
+  const saturationUnit = saturation / 100;
+  const brightnessUnit = brightness / 100;
+  const chroma = brightnessUnit * saturationUnit;
+  const x = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = brightnessUnit - chroma;
+
+  let redPrime = 0;
+  let greenPrime = 0;
+  let bluePrime = 0;
+
+  if (hue < 60) {
+    redPrime = chroma;
+    greenPrime = x;
+  } else if (hue < 120) {
+    redPrime = x;
+    greenPrime = chroma;
+  } else if (hue < 180) {
+    greenPrime = chroma;
+    bluePrime = x;
+  } else if (hue < 240) {
+    greenPrime = x;
+    bluePrime = chroma;
+  } else if (hue < 300) {
+    redPrime = x;
+    bluePrime = chroma;
+  } else {
+    redPrime = chroma;
+    bluePrime = x;
+  }
+
+  return rgbChannelsToHex(
+    (redPrime + m) * 255,
+    (greenPrime + m) * 255,
+    (bluePrime + m) * 255
+  );
+}
+
 function normalizeHexColor(value, fallback = "000000") {
   if (typeof value === "string") {
     const normalized = value.trim().replace(/^#/, "").toLowerCase();
@@ -188,6 +257,13 @@ function normalizeHexColor(value, fallback = "000000") {
       value.b ?? value.blue
     );
     if (rgbHex) return rgbHex;
+
+    const hsvHex = hsvLikeToHex(
+      value.h ?? value.hue,
+      value.s ?? value.saturation,
+      value.v ?? value.b ?? value.value ?? value.brightness
+    );
+    if (hsvHex) return hsvHex;
   }
 
   return normalizeHexColor(fallback, "000000");
@@ -302,6 +378,24 @@ function compensateHexForRendererLightness(value, fallback = "000000") {
   return `#${rgbUnitToHex(hslToRgbUnit(compensated))}`;
 }
 
+function applyRendererLightnessToHex(value, fallback = "000000") {
+  const normalized = normalizeHexColor(value, fallback);
+  const lightnessDelta = getNodeLightnessCompensation();
+
+  if (Math.abs(lightnessDelta) < 1e-6) {
+    return normalized;
+  }
+
+  const hsl = rgbUnitToHsl(hexToRgbUnit(normalized));
+  const adjusted = {
+    h: hsl.h,
+    s: hsl.s,
+    l: clampUnit(hsl.l + lightnessDelta)
+  };
+
+  return rgbUnitToHex(hslToRgbUnit(adjusted));
+}
+
 function redrawCanvas() {
   app.canvas?.setDirty?.(true, true);
   app.graph?.setDirtyCanvas?.(true, true);
@@ -382,22 +476,27 @@ function ensureOriginalNodeColors() {
   return snapshot;
 }
 
-function getThemeStockPreset(presetKey) {
+function getThemeStockRawPreset(presetKey) {
   const originalNodeColors = ensureOriginalNodeColors();
   return originalNodeColors?.[presetKey] ?? BUILTIN_PRESET_DEFAULTS[presetKey];
 }
 
-function getThemeStockPresetField(presetKey, field) {
-  return normalizeHexColor(
-    getThemeStockPreset(presetKey)?.[field],
-    normalizeHexColor(BUILTIN_PRESET_DEFAULTS[presetKey][field])
+function getThemeStockVisibleField(presetKey, field) {
+  const rawValue = getThemeStockRawPreset(presetKey)?.[field];
+  const rawFallback = normalizeHexColor(BUILTIN_PRESET_DEFAULTS[presetKey][field]);
+  return applyRendererLightnessToHex(rawValue, rawFallback);
+}
+
+function getThemeStockVisiblePreset(presetKey) {
+  return Object.fromEntries(
+    PRESET_FIELDS.map((field) => [field, getThemeStockVisibleField(presetKey, field)])
   );
 }
 
 function loadSavedSettingsIntoCurrentState() {
   for (const presetKey of BUILTIN_PRESET_KEYS) {
     for (const field of PRESET_FIELDS) {
-      const defaultValue = getThemeStockPresetField(presetKey, field);
+      const defaultValue = getThemeStockVisibleField(presetKey, field);
       currentSettings[presetKey][field] = normalizeHexColor(
         getStoredSettingValue(getSettingId(presetKey, field), defaultValue),
         defaultValue
@@ -440,14 +539,16 @@ function syncExistingGraphColors(previousNodeColors, nextNodeColors) {
 
   for (const node of graph._nodes ?? []) {
     if (!node) continue;
+    if (typeof node.color !== "string" || typeof node.bgcolor !== "string") continue;
+
+    const nodeColor = normalizeCanvasHexColor(node.color);
+    const nodeBgColor = normalizeCanvasHexColor(node.bgcolor);
 
     for (const presetKey of BUILTIN_PRESET_KEYS) {
       const previous = previousNodeColors?.[presetKey];
       const next = nextNodeColors?.[presetKey];
       if (!previous || !next) continue;
 
-      const nodeColor = normalizeCanvasHexColor(node.color ?? previous.color);
-      const nodeBgColor = normalizeCanvasHexColor(node.bgcolor ?? previous.bgcolor);
       const previousColor = normalizeCanvasHexColor(previous.color);
       const previousBgColor = normalizeCanvasHexColor(previous.bgcolor);
 
@@ -461,13 +562,15 @@ function syncExistingGraphColors(previousNodeColors, nextNodeColors) {
 
   for (const group of graph._groups ?? []) {
     if (!group) continue;
+    if (typeof group.color !== "string") continue;
+
+    const groupColor = normalizeCanvasHexColor(group.color);
 
     for (const presetKey of BUILTIN_PRESET_KEYS) {
       const previous = previousNodeColors?.[presetKey];
       const next = nextNodeColors?.[presetKey];
       if (!previous || !next) continue;
 
-      const groupColor = normalizeCanvasHexColor(group.color ?? previous.groupcolor);
       const previousGroupColor = normalizeCanvasHexColor(previous.groupcolor);
 
       if (groupColor === previousGroupColor) {
@@ -491,9 +594,13 @@ function applyNodeColors() {
   const originalNodeColors = ensureOriginalNodeColors();
   if (!originalNodeColors) return;
 
-  const nextNodeColors = buildNodeColorOverrides(originalNodeColors);
+  const themeSignature = patchState.activeThemeSignature ?? getThemeSignature();
   const previousNodeColors =
-    patchState.lastAppliedNodeColors ?? cloneNodeColors(originalNodeColors);
+    patchState.lastAppliedThemeSignature === themeSignature && patchState.lastAppliedNodeColors
+      ? patchState.lastAppliedNodeColors
+      : cloneNodeColors(originalNodeColors);
+
+  const nextNodeColors = buildNodeColorOverrides(originalNodeColors);
 
   syncExistingGraphColors(previousNodeColors, nextNodeColors);
 
@@ -501,6 +608,7 @@ function applyNodeColors() {
     LGraphCanvas.node_colors[presetKey] = nextNodeColors[presetKey];
   }
 
+  patchState.lastAppliedThemeSignature = themeSignature;
   patchState.lastAppliedNodeColors = cloneNodeColors(nextNodeColors);
   redrawCanvas();
 }
@@ -509,7 +617,7 @@ function setPresetToValues(presetKey, values, syncStoredSettings = false) {
   for (const field of PRESET_FIELDS) {
     const normalized = normalizeHexColor(
       values?.[field],
-      getThemeStockPresetField(presetKey, field)
+      getThemeStockVisibleField(presetKey, field)
     );
     currentSettings[presetKey][field] = normalized;
 
@@ -520,19 +628,19 @@ function setPresetToValues(presetKey, values, syncStoredSettings = false) {
 }
 
 function resetPresetToStock(presetKey, syncStoredSettings = true) {
-  setPresetToValues(presetKey, getThemeStockPreset(presetKey), syncStoredSettings);
+  setPresetToValues(presetKey, getThemeStockVisiblePreset(presetKey), syncStoredSettings);
   applyNodeColors();
 }
 
 function resetAllPresetsToStock(syncStoredSettings = true) {
   for (const presetKey of BUILTIN_PRESET_KEYS) {
-    setPresetToValues(presetKey, getThemeStockPreset(presetKey), syncStoredSettings);
+    setPresetToValues(presetKey, getThemeStockVisiblePreset(presetKey), syncStoredSettings);
   }
   applyNodeColors();
 }
 
 function applyPresetSetting(presetKey, field, value) {
-  const fallback = getThemeStockPresetField(presetKey, field);
+  const fallback = getThemeStockVisibleField(presetKey, field);
   currentSettings[presetKey][field] = normalizeHexColor(value, fallback);
   applyNodeColors();
 }
@@ -540,7 +648,7 @@ function applyPresetSetting(presetKey, field, value) {
 function createPresetFieldSetting(presetKey, field) {
   const label = PRESET_LABELS[presetKey];
   const fieldLabel = PRESET_FIELD_LABELS[field];
-  const defaultValue = getThemeStockPresetField(presetKey, field);
+  const defaultValue = getThemeStockVisibleField(presetKey, field);
 
   return {
     id: getSettingId(presetKey, field),
