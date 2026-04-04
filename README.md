@@ -90,3 +90,17 @@ Current behavior:
 Notes:
 
 - `Link stroke color` uses the chosen color with a fixed semi-transparent stroke so the default ComfyUI look stays close to stock.
+
+### Custom Node Colors
+
+Custom Node Colors adds a `Custom` entry into the standard ComfyUI node/group color menu.
+
+Current behavior:
+
+- Hooks the built-in `Node Colors` context menu through `LGraphCanvas.onMenuNodeColors`
+- Opens a native browser color picker
+- Applies custom colors directly to the selected node or group
+- For nodes, stores the picked color in `bgcolor` and applies a slightly lighter derived `color` to match the original pythongosssss behavior
+- For groups, stores the picked color directly in `group.color`
+- Applies the color to all selected nodes when multiple nodes are selected
+- Stores raw custom colors on the node/group itself, so they serialize with the workflow and stay independent from theme palette presets
