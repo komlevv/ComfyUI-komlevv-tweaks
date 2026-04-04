@@ -25,6 +25,7 @@ Custom settings from this repo live under:
 
 Current tweak groups:
 
+- `komlevv-tweaks > Canvas Style`
 - `komlevv-tweaks > Link Style`
 
 ## Repository layout
@@ -34,9 +35,24 @@ Current tweak groups:
 
 ## Included tweaks
 
+### Canvas Style
+
+Canvas Style is the tweak group for graph canvas background behavior.
+
+Current settings added by this tweak group:
+
+- `Force hide background pattern`
+
+Current behavior:
+
+- Suppresses the LiteGraph background pattern layer
+- Suppresses the low-zoom background fill that would otherwise darken the canvas during zoom out
+- Keeps the canvas background visually consistent across zoom levels
+- Works both with and without a custom Canvas Background Image
+
 ### Link Style
 
-Link Style is the shared tweak group for link-related visual customization.
+Link Style is the tweak group for link-related visual customization.
 
 Current settings added by this tweak group:
 
