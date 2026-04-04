@@ -4,6 +4,7 @@ import { makeKomlevvTweaksCategory } from "./komlevv_tweaks_common.js";
 const EXTENSION_ID = "komlevv.tweaks.nodeColors";
 const PATCH_STATE_KEY = "__komlevvTweaksNodeColorsPatchState";
 const COLOR_PICKER_BORDER_STYLE_ID = "komlevv-tweaks-color-picker-border-style";
+const PALETTE_SETTING_ID = "Comfy.ColorPalette";
 
 const BUILTIN_PRESET_KEYS = [
   "red",
@@ -67,8 +68,9 @@ function getPatchState() {
     globalThis[PATCH_STATE_KEY] = {
       originalNodeColorsByTheme: new Map(),
       activeThemeSignature: null,
-      lastAppliedThemeSignature: null,
-      lastAppliedNodeColors: null
+      lastAppliedDefaultNodeColors: null,
+      lastAppliedNodeColors: null,
+      paletteListenerInstalled: false
     };
   }
 
@@ -135,15 +137,25 @@ function rgbChannelsToHex(red, green, blue) {
     .join("");
 }
 
+function rgbLikeToHex(red, green, blue) {
+  const channels = [Number(red), Number(green), Number(blue)];
+  if (channels.some((value) => !Number.isFinite(value))) return null;
+
+  const maxChannel = Math.max(...channels.map((value) => Math.abs(value)));
+  const scale = maxChannel <= 1 ? 255 : 1;
+
+  return rgbChannelsToHex(
+    channels[0] * scale,
+    channels[1] * scale,
+    channels[2] * scale
+  );
+}
+
 function normalizeHue(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return null;
 
-  const normalized =
-    Math.abs(numeric) <= 1
-      ? numeric * 360
-      : numeric;
-
+  const normalized = Math.abs(numeric) <= 1 ? numeric * 360 : numeric;
   return ((normalized % 360) + 360) % 360;
 }
 
@@ -151,11 +163,7 @@ function normalizeColorPercentage(value) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return null;
 
-  const normalized =
-    Math.abs(numeric) <= 1
-      ? numeric * 100
-      : numeric;
-
+  const normalized = Math.abs(numeric) <= 1 ? numeric * 100 : numeric;
   return Math.max(0, Math.min(100, normalized));
 }
 
@@ -233,13 +241,13 @@ function normalizeHexColor(value, fallback = "000000") {
     const rgbMatch = normalized.match(/^rgba?\(([^)]+)\)$/);
     if (rgbMatch) {
       const channels = rgbMatch[1].split(",").map((part) => part.trim());
-      const rgbHex = rgbChannelsToHex(channels[0], channels[1], channels[2]);
+      const rgbHex = rgbLikeToHex(channels[0], channels[1], channels[2]);
       if (rgbHex) return rgbHex;
     }
   }
 
   if (Array.isArray(value) && value.length >= 3) {
-    const rgbHex = rgbChannelsToHex(value[0], value[1], value[2]);
+    const rgbHex = rgbLikeToHex(value[0], value[1], value[2]);
     if (rgbHex) return rgbHex;
   }
 
@@ -251,17 +259,24 @@ function normalizeHexColor(value, fallback = "000000") {
       }
     }
 
-    const rgbHex = rgbChannelsToHex(
-      value.r ?? value.red,
-      value.g ?? value.green,
-      value.b ?? value.blue
-    );
-    if (rgbHex) return rgbHex;
+    const hasRgbKeys =
+      ("r" in value || "red" in value) &&
+      ("g" in value || "green" in value) &&
+      ("b" in value || "blue" in value);
+
+    if (hasRgbKeys) {
+      const rgbHex = rgbLikeToHex(
+        value.r ?? value.red,
+        value.g ?? value.green,
+        value.b ?? value.blue
+      );
+      if (rgbHex) return rgbHex;
+    }
 
     const hsvHex = hsvLikeToHex(
       value.h ?? value.hue,
       value.s ?? value.saturation,
-      value.v ?? value.b ?? value.value ?? value.brightness
+      value.v ?? value.value ?? value.brightness ?? value.b
     );
     if (hsvHex) return hsvHex;
   }
@@ -442,7 +457,7 @@ function getThemeSignature() {
   let paletteId = "unknown";
 
   try {
-    const storedPaletteId = store?.get?.("Comfy.ColorPalette");
+    const storedPaletteId = store?.get?.(PALETTE_SETTING_ID);
     if (storedPaletteId != null && storedPaletteId !== "") {
       paletteId = String(storedPaletteId);
     }
@@ -456,6 +471,21 @@ function getThemeSignature() {
   return `${paletteId}::lightness=${Number.isFinite(lightness) ? lightness : 0}::opacity=${Number.isFinite(opacity) ? opacity : 1}`;
 }
 
+function getCurrentDefaultNodeColors() {
+  const liteGraph = globalThis?.LiteGraph ?? null;
+
+  return {
+    color: normalizeCanvasHexColor(
+      liteGraph?.NODE_DEFAULT_COLOR ?? BUILTIN_PRESET_DEFAULTS.black.color,
+      BUILTIN_PRESET_DEFAULTS.black.color
+    ),
+    bgcolor: normalizeCanvasHexColor(
+      liteGraph?.NODE_DEFAULT_BGCOLOR ?? BUILTIN_PRESET_DEFAULTS.black.bgcolor,
+      BUILTIN_PRESET_DEFAULTS.black.bgcolor
+    )
+  };
+}
+
 function ensureOriginalNodeColors() {
   const patchState = getPatchState();
   const LGraphCanvas = getLiteGraphCanvasClass();
@@ -464,9 +494,7 @@ function ensureOriginalNodeColors() {
   const themeSignature = getThemeSignature();
   patchState.activeThemeSignature = themeSignature;
 
-  const existingSnapshot =
-    patchState.originalNodeColorsByTheme?.get?.(themeSignature) ?? null;
-
+  const existingSnapshot = patchState.originalNodeColorsByTheme.get(themeSignature) ?? null;
   if (existingSnapshot) {
     return existingSnapshot;
   }
@@ -533,9 +561,19 @@ function buildNodeColorOverrides(baseNodeColors) {
   );
 }
 
-function syncExistingGraphColors(previousNodeColors, nextNodeColors) {
+function syncExistingGraphColors(
+  previousNodeColors,
+  nextNodeColors,
+  previousDefaultNodeColors,
+  nextDefaultNodeColors
+) {
   const graph = getGraph();
   if (!graph) return;
+
+  const previousDefaultColor = normalizeCanvasHexColor(previousDefaultNodeColors?.color);
+  const previousDefaultBgColor = normalizeCanvasHexColor(previousDefaultNodeColors?.bgcolor);
+  const nextDefaultColor = normalizeCanvasHexColor(nextDefaultNodeColors?.color);
+  const nextDefaultBgColor = normalizeCanvasHexColor(nextDefaultNodeColors?.bgcolor);
 
   for (const node of graph._nodes ?? []) {
     if (!node) continue;
@@ -543,6 +581,12 @@ function syncExistingGraphColors(previousNodeColors, nextNodeColors) {
 
     const nodeColor = normalizeCanvasHexColor(node.color);
     const nodeBgColor = normalizeCanvasHexColor(node.bgcolor);
+
+    if (nodeColor === previousDefaultColor && nodeBgColor === previousDefaultBgColor) {
+      node.color = nextDefaultColor;
+      node.bgcolor = nextDefaultBgColor;
+      continue;
+    }
 
     for (const presetKey of BUILTIN_PRESET_KEYS) {
       const previous = previousNodeColors?.[presetKey];
@@ -594,21 +638,26 @@ function applyNodeColors() {
   const originalNodeColors = ensureOriginalNodeColors();
   if (!originalNodeColors) return;
 
-  const themeSignature = patchState.activeThemeSignature ?? getThemeSignature();
   const previousNodeColors =
-    patchState.lastAppliedThemeSignature === themeSignature && patchState.lastAppliedNodeColors
-      ? patchState.lastAppliedNodeColors
-      : cloneNodeColors(originalNodeColors);
+    patchState.lastAppliedNodeColors ?? cloneNodeColors(originalNodeColors);
+  const previousDefaultNodeColors =
+    patchState.lastAppliedDefaultNodeColors ?? getCurrentDefaultNodeColors();
 
   const nextNodeColors = buildNodeColorOverrides(originalNodeColors);
+  const nextDefaultNodeColors = getCurrentDefaultNodeColors();
 
-  syncExistingGraphColors(previousNodeColors, nextNodeColors);
+  syncExistingGraphColors(
+    previousNodeColors,
+    nextNodeColors,
+    previousDefaultNodeColors,
+    nextDefaultNodeColors
+  );
 
   for (const presetKey of BUILTIN_PRESET_KEYS) {
     LGraphCanvas.node_colors[presetKey] = nextNodeColors[presetKey];
   }
 
-  patchState.lastAppliedThemeSignature = themeSignature;
+  patchState.lastAppliedDefaultNodeColors = { ...nextDefaultNodeColors };
   patchState.lastAppliedNodeColors = cloneNodeColors(nextNodeColors);
   redrawCanvas();
 }
@@ -706,7 +755,32 @@ function createResetPresetCommand(presetKey) {
   };
 }
 
+function installPaletteChangeListener() {
+  const patchState = getPatchState();
+  if (patchState.paletteListenerInstalled) return;
+
+  const store = getSettingStore();
+  if (!store?.set) return;
+
+  const originalSet = store.set.bind(store);
+
+  store.set = function patchedSet(settingId, value, ...rest) {
+    const result = originalSet(settingId, value, ...rest);
+
+    if (settingId === PALETTE_SETTING_ID) {
+      queueMicrotask(() => {
+        applyAllSettings();
+      });
+    }
+
+    return result;
+  };
+
+  patchState.paletteListenerInstalled = true;
+}
+
 function applyAllSettings() {
+  installPaletteChangeListener();
   loadSavedSettingsIntoCurrentState();
   applyNodeColors();
 }
