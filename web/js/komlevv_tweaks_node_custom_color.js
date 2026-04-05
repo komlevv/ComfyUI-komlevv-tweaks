@@ -1,5 +1,6 @@
 import { app } from "../../scripts/app.js";
 import { $el } from "../../scripts/ui.js";
+import { patchLightThemeCustomNodeColors } from "./komlevv_tweaks_light_theme_custom_node_color_patch.js";
 
 const EXTENSION_ID = "komlevv.tweaks.nodeCustomColor";
 
@@ -50,68 +51,6 @@ function normalizePickerValue(value, fallback = "#000000") {
   }
 
   return normalizePickerValue(fallback, "#000000");
-}
-
-function patchLightThemeCustomNodeColors() {
-  const LiteGraphRef = globalThis?.LiteGraph;
-  const nodePrototype = LiteGraphRef?.LGraphNode?.prototype;
-  if (!LiteGraphRef || !nodePrototype) return;
-  if (nodePrototype.__komlevvCustomNodeColorLightThemePatched) return;
-
-  const renderingColorDescriptor = Object.getOwnPropertyDescriptor(
-    nodePrototype,
-    "renderingColor"
-  );
-  const renderingBgColorDescriptor = Object.getOwnPropertyDescriptor(
-    nodePrototype,
-    "renderingBgColor"
-  );
-
-  if (!renderingColorDescriptor?.get || !renderingBgColorDescriptor?.get) {
-    return;
-  }
-
-  function callWithoutNodeLightness(getter, node) {
-    const previousNodeLightness = LiteGraphRef.nodeLightness;
-    LiteGraphRef.nodeLightness = undefined;
-
-    try {
-      return getter.call(node);
-    } finally {
-      LiteGraphRef.nodeLightness = previousNodeLightness;
-    }
-  }
-
-  Object.defineProperty(nodePrototype, "renderingColor", {
-    configurable: true,
-    enumerable: renderingColorDescriptor.enumerable ?? false,
-    get() {
-      if (this.color != null) {
-        return callWithoutNodeLightness(renderingColorDescriptor.get, this);
-      }
-
-      return renderingColorDescriptor.get.call(this);
-    }
-  });
-
-  Object.defineProperty(nodePrototype, "renderingBgColor", {
-    configurable: true,
-    enumerable: renderingBgColorDescriptor.enumerable ?? false,
-    get() {
-      if (this.bgcolor != null) {
-        return callWithoutNodeLightness(renderingBgColorDescriptor.get, this);
-      }
-
-      return renderingBgColorDescriptor.get.call(this);
-    }
-  });
-
-  Object.defineProperty(nodePrototype, "__komlevvCustomNodeColorLightThemePatched", {
-    value: true,
-    configurable: false,
-    enumerable: false,
-    writable: false
-  });
 }
 
 function redrawCanvas() {
