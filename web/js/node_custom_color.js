@@ -1,12 +1,12 @@
 import { app } from "../../scripts/app.js";
 import { $el } from "../../scripts/ui.js";
-import { patchLightThemeCustomNodeColors } from "./komlevv_tweaks_light_theme_custom_node_color_patch.js";
+import { patchLightThemeCustomNodeColors } from "./light_theme_custom_node_color_patch.js";
 import {
   getColorTargetPreviewColor,
   getSelectedColorTargets,
   normalizeHexColor,
   shadeHexColor
-} from "./komlevv_tweaks_node_color_shared.js";
+} from "./node_color_shared.js";
 
 patchLightThemeCustomNodeColors();
 

@@ -1,8 +1,8 @@
-import { LIGHT_THEME_PRESET_COLORS } from "./komlevv_tweaks_light_theme_preset_colors.js";
+import { LIGHT_THEME_PRESET_COLORS } from "./light_theme_preset_colors.js";
 import {
   getColorTargetPreviewColor,
   getSelectedColorTargets
-} from "./komlevv_tweaks_node_color_shared.js";
+} from "./node_color_shared.js";
 
 /**
  * Shared frontend patch for ComfyUI light-theme explicit color rendering.
