@@ -1,3 +1,5 @@
+import { LIGHT_THEME_PRESET_BGCOLORS } from "./komlevv_tweaks_light_theme_preset_colors.js";
+
 /**
  * Shared frontend patch for ComfyUI light-theme explicit color rendering.
  *
@@ -37,18 +39,6 @@ const ORIGINAL_NODE_COLORS_MARKER = "__komlevvOriginalNodeColors";
 const TOOLBOX_SELECTOR = ".selection-toolbox";
 const CURRENT_COLOR_SELECTOR =
   '.selection-toolbox [data-testid="color-picker-current-color"]';
-
-const LIGHT_THEME_PRESET_BGCOLORS = {
-  red: "#d2b5b5",
-  brown: "#d6bab2",
-  green: "#b5d2b5",
-  blue: "#b5b5d2",
-  pale_blue: "#c3cfd4",
-  cyan: "#b5d2d2",
-  purple: "#d2b5d2",
-  yellow: "#ddd2bb",
-  black: "#808080"
-};
 
 function isGraphNode(item) {
   const LGraphNodeRef = globalThis?.LiteGraph?.LGraphNode;
