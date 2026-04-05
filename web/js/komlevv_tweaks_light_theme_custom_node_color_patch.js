@@ -13,7 +13,10 @@
  *
  * What this patch does:
  * - bypasses `LiteGraph.nodeLightness` for nodes with explicit colors
- * - forces Selection Toolbox preset previews to use raw preset bg colors
+ * - swaps standard preset colors to a hardcoded light-theme palette when the
+ *   light-theme node lightness heuristic is active
+ * - restores the original preset colors when switching back away from light theme
+ * - forces Selection Toolbox preset previews to use the same raw preset colors
  * - forces the Selection Toolbox current-color indicator to use the raw
  *   explicit color of the selected node/group when there is an unambiguous
  *   explicit color to show
@@ -30,9 +33,22 @@
  */
 const NODE_PATCH_MARKER = "__komlevvCustomNodeColorLightThemePatched";
 const TOOLBOX_PATCH_MARKER = "__komlevvLightThemeToolboxPreviewPatched";
+const ORIGINAL_NODE_COLORS_MARKER = "__komlevvOriginalNodeColors";
 const TOOLBOX_SELECTOR = ".selection-toolbox";
 const CURRENT_COLOR_SELECTOR =
   '.selection-toolbox [data-testid="color-picker-current-color"]';
+
+const LIGHT_THEME_PRESET_BGCOLORS = {
+  red: "#d2b5b5",
+  brown: "#d6bab2",
+  green: "#b5d2b5",
+  blue: "#b5b5d2",
+  pale_blue: "#c3cfd4",
+  cyan: "#b5d2d2",
+  purple: "#d2b5d2",
+  yellow: "#ddd2bb",
+  black: "#808080"
+};
 
 function isGraphNode(item) {
   const LGraphNodeRef = globalThis?.LiteGraph?.LGraphNode;
@@ -46,6 +62,89 @@ function isGraphGroup(item) {
 
 function isColorTarget(item) {
   return isGraphNode(item) || isGraphGroup(item);
+}
+
+function isLightThemeNodeHeuristicActive() {
+  const nodeLightness = globalThis?.LiteGraph?.nodeLightness;
+  return typeof nodeLightness === "number" && !Number.isNaN(nodeLightness) && nodeLightness !== 0;
+}
+
+function cloneNodeColors(nodeColors) {
+  return Object.fromEntries(
+    Object.entries(nodeColors ?? {}).map(([name, colorOption]) => [
+      name,
+      colorOption ? { ...colorOption } : colorOption
+    ])
+  );
+}
+
+function colorShade(col, amt) {
+  let normalized = String(col ?? "").trim().replace(/^#/, "");
+  if (normalized.length === 3) {
+    normalized = normalized
+      .split("")
+      .map((channel) => channel + channel)
+      .join("");
+  }
+
+  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
+    normalized = "000000";
+  }
+
+  let [r, g, b] = normalized.match(/.{2}/g);
+  [r, g, b] = [
+    parseInt(r, 16) + amt,
+    parseInt(g, 16) + amt,
+    parseInt(b, 16) + amt
+  ];
+
+  r = Math.max(Math.min(255, r), 0).toString(16);
+  g = Math.max(Math.min(255, g), 0).toString(16);
+  b = Math.max(Math.min(255, b), 0).toString(16);
+
+  return `#${r.padStart(2, "0")}${g.padStart(2, "0")}${b.padStart(2, "0")}`;
+}
+
+function getOriginalNodeColors() {
+  const graphCanvasRef = globalThis?.LGraphCanvas;
+  if (!graphCanvasRef?.node_colors) return null;
+
+  if (!globalThis[ORIGINAL_NODE_COLORS_MARKER]) {
+    Object.defineProperty(globalThis, ORIGINAL_NODE_COLORS_MARKER, {
+      value: cloneNodeColors(graphCanvasRef.node_colors),
+      configurable: false,
+      enumerable: false,
+      writable: false
+    });
+  }
+
+  return globalThis[ORIGINAL_NODE_COLORS_MARKER];
+}
+
+function buildLightThemePresetNodeColors(originalNodeColors) {
+  const nextNodeColors = cloneNodeColors(originalNodeColors);
+
+  for (const [name, bgcolor] of Object.entries(LIGHT_THEME_PRESET_BGCOLORS)) {
+    const existing = nextNodeColors[name] ?? {};
+    nextNodeColors[name] = {
+      ...existing,
+      color: colorShade(bgcolor, 20),
+      bgcolor,
+      groupcolor: bgcolor
+    };
+  }
+
+  return nextNodeColors;
+}
+
+function syncPresetNodeColorsForTheme() {
+  const graphCanvasRef = globalThis?.LGraphCanvas;
+  const originalNodeColors = getOriginalNodeColors();
+  if (!graphCanvasRef || !originalNodeColors) return;
+
+  graphCanvasRef.node_colors = isLightThemeNodeHeuristicActive()
+    ? buildLightThemePresetNodeColors(originalNodeColors)
+    : cloneNodeColors(originalNodeColors);
 }
 
 function getSelectedTargets() {
@@ -90,13 +189,18 @@ function getUniformExplicitPreviewColor() {
 function syncToolboxPreviewColors() {
   if (typeof document === "undefined") return;
 
+  syncPresetNodeColorsForTheme();
+
+  const isLightThemeActive = isLightThemeNodeHeuristicActive();
   const nodeColors = globalThis?.LGraphCanvas?.node_colors ?? {};
   for (const [name, colorOption] of Object.entries(nodeColors)) {
     const selector = `${TOOLBOX_SELECTOR} .p-selectbutton [data-testid="${name}"]`;
     const icons = document.querySelectorAll(selector);
     for (const icon of icons) {
-      if (colorOption?.bgcolor) {
+      if (isLightThemeActive && colorOption?.bgcolor) {
         icon.style.color = colorOption.bgcolor;
+      } else {
+        icon.style.removeProperty("color");
       }
     }
   }
@@ -189,6 +293,7 @@ function definePatchedGetter(target, propertyName, descriptor, shouldBypass) {
 
 export function patchLightThemeCustomNodeColors() {
   patchLightThemeToolboxPreviewColors();
+  syncPresetNodeColorsForTheme();
 
   const LiteGraphRef = globalThis?.LiteGraph;
   const nodePrototype = LiteGraphRef?.LGraphNode?.prototype;
