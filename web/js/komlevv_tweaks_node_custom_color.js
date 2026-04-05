@@ -63,8 +63,17 @@ function redrawCanvas() {
   app.graph?.setDirtyCanvas?.(true, true);
 }
 
+function isColorTarget(item) {
+  return item instanceof LiteGraph.LGraphNode || item instanceof LiteGraph.LGraphGroup;
+}
+
 function getSelectedTargets() {
   const graphcanvas = LGraphCanvas.active_canvas;
+  const selectedItems = [...(graphcanvas?.selectedItems ?? [])].filter(isColorTarget);
+  if (selectedItems.length) {
+    return selectedItems;
+  }
+
   const selectedNodes = Object.values(graphcanvas?.selected_nodes ?? {});
   if (selectedNodes.length) {
     return selectedNodes;
@@ -76,13 +85,13 @@ function getSelectedTargets() {
 
 function getDisplayColorForNode(node) {
   if (!node) return null;
-  return node.constructor === LiteGraph.LGraphGroup ? node.color : node.bgcolor;
+  return node instanceof LiteGraph.LGraphGroup ? node.color : node.bgcolor;
 }
 
 function applyColorToNode(node, pickerValue) {
   if (!node || !pickerValue) return;
 
-  if (node.constructor === LiteGraph.LGraphGroup) {
+  if (node instanceof LiteGraph.LGraphGroup) {
     node.color = pickerValue;
   } else {
     const shadedTitleColor = colorShade(pickerValue, 20);
