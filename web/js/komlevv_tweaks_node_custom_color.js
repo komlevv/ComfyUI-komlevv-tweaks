@@ -1,6 +1,5 @@
 import { app } from "../../scripts/app.js";
 import { $el } from "../../scripts/ui.js";
-import { patchLightThemeCustomNodeColors } from "./komlevv_tweaks_light_theme_custom_node_color_patch.js";
 
 const EXTENSION_ID = "komlevv.tweaks.nodeCustomColor";
 
@@ -80,8 +79,6 @@ function applyColorToNode(node, pickerValue) {
 app.registerExtension({
   name: EXTENSION_ID,
   setup() {
-    patchLightThemeCustomNodeColors();
-
     if (LGraphCanvas.__komlevvNodeCustomColorMenuPatched) return;
     Object.defineProperty(LGraphCanvas, "__komlevvNodeCustomColorMenuPatched", {
       value: true,

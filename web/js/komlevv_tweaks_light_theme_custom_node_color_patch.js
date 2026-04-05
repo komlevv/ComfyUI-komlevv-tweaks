@@ -1,3 +1,6 @@
+import { app } from "../../scripts/app.js";
+
+const EXTENSION_ID = "komlevv.tweaks.lightThemeCustomNodeColorPatch";
 const PATCH_MARKER = "__komlevvCustomNodeColorLightThemePatched";
 
 function definePatchedGetter(target, propertyName, descriptor, shouldBypass) {
@@ -27,7 +30,7 @@ function definePatchedGetter(target, propertyName, descriptor, shouldBypass) {
   });
 }
 
-export function patchLightThemeCustomNodeColors() {
+function patchLightThemeCustomNodeColors() {
   const LiteGraphRef = globalThis?.LiteGraph;
   const nodePrototype = LiteGraphRef?.LGraphNode?.prototype;
   if (!LiteGraphRef || !nodePrototype) return false;
@@ -69,6 +72,20 @@ export function patchLightThemeCustomNodeColors() {
   return true;
 }
 
-export function isLightThemeCustomNodeColorPatchApplied() {
+function isLightThemeCustomNodeColorPatchApplied() {
   return Boolean(globalThis?.LiteGraph?.LGraphNode?.prototype?.[PATCH_MARKER]);
 }
+
+globalThis.komlevvTweaks ??= {};
+globalThis.komlevvTweaks.patchLightThemeCustomNodeColors = patchLightThemeCustomNodeColors;
+globalThis.komlevvTweaks.isLightThemeCustomNodeColorPatchApplied =
+  isLightThemeCustomNodeColorPatchApplied;
+
+patchLightThemeCustomNodeColors();
+
+app.registerExtension({
+  name: EXTENSION_ID,
+  setup() {
+    patchLightThemeCustomNodeColors();
+  }
+});
