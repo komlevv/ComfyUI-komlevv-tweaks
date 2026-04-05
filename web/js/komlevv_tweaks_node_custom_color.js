@@ -5,6 +5,8 @@ import { patchLightThemeCustomNodeColors } from "./komlevv_tweaks_light_theme_cu
 patchLightThemeCustomNodeColors();
 
 const EXTENSION_ID = "komlevv.tweaks.nodeCustomColor";
+const CUSTOM_SWATCH_BUTTON_SELECTOR = '[data-komlevv-custom-color-button="true"]';
+const CUSTOM_SWATCH_SELECTOR = '[data-komlevv-custom-color-swatch="true"]';
 
 function colorShade(col, amt) {
   let normalized = String(col ?? "").trim().replace(/^#/, "");
@@ -67,6 +69,31 @@ function isNodeColorsMenu(menuElement) {
   return text.includes("No color") || content.includes("No color");
 }
 
+function getSelectedTargets(preferredNode = null) {
+  const graphcanvas = LGraphCanvas.active_canvas;
+  const selectedNodes = Object.values(graphcanvas?.selected_nodes ?? {});
+
+  if (preferredNode) {
+    if (preferredNode.constructor !== LiteGraph.LGraphGroup && selectedNodes.length > 1) {
+      return selectedNodes;
+    }
+
+    return [preferredNode];
+  }
+
+  if (selectedNodes.length) {
+    return selectedNodes;
+  }
+
+  const selectedGroup = graphcanvas?.selected_group ?? graphcanvas?.selectedGroup;
+  return selectedGroup ? [selectedGroup] : [];
+}
+
+function getDisplayColorForNode(node) {
+  if (!node) return null;
+  return node.constructor === LiteGraph.LGraphGroup ? node.color : node.bgcolor;
+}
+
 function applyColorToNode(node, pickerValue) {
   if (!node || !pickerValue) return;
 
@@ -93,7 +120,110 @@ app.registerExtension({
     });
 
     let picker;
-    let activeNode;
+    let activeTargets = [];
+    let pendingToolboxSync = false;
+
+    function syncCustomToolboxButtons() {
+      pendingToolboxSync = false;
+
+      const selectButtons = document.querySelectorAll(".selection-toolbox .p-selectbutton");
+      for (const selectButton of selectButtons) {
+        let customButton = selectButton.querySelector(CUSTOM_SWATCH_BUTTON_SELECTOR);
+        if (!customButton) {
+          const templateButton = selectButton.querySelector("button");
+          if (!templateButton) continue;
+
+          customButton = templateButton.cloneNode(true);
+          customButton.dataset.komlevvCustomColorButton = "true";
+          customButton.setAttribute("title", "Custom");
+          customButton.setAttribute("aria-label", "Custom");
+          customButton.classList.remove("p-highlight", "p-togglebutton-checked");
+          customButton.removeAttribute("aria-pressed");
+          customButton.removeAttribute("data-p-highlight");
+
+          const customSwatch = document.createElement("span");
+          customSwatch.dataset.komlevvCustomColorSwatch = "true";
+          customSwatch.style.display = "block";
+          customSwatch.style.width = "0.9rem";
+          customSwatch.style.height = "0.9rem";
+          customSwatch.style.borderRadius = "9999px";
+          customSwatch.style.boxSizing = "border-box";
+
+          customButton.replaceChildren(customSwatch);
+          customButton.onclick = (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const targets = getSelectedTargets();
+            if (!targets.length) return;
+
+            ensurePicker();
+            activeTargets = targets;
+            picker.value = normalizePickerValue(
+              getDisplayColorForNode(targets[0]),
+              "#000000"
+            );
+            picker.click();
+          };
+
+          selectButton.append(customButton);
+        }
+
+        const customSwatch = customButton.querySelector(CUSTOM_SWATCH_SELECTOR);
+        if (!customSwatch) continue;
+
+        const previewColor = getDisplayColorForNode(getSelectedTargets()[0]);
+        if (previewColor) {
+          customSwatch.style.background = normalizePickerValue(previewColor, previewColor);
+          customSwatch.style.border = "1px solid rgba(0, 0, 0, 0.18)";
+          customSwatch.style.boxShadow = "inset 0 0 0 1px rgba(255, 255, 255, 0.22)";
+        } else {
+          customSwatch.style.background = "transparent";
+          customSwatch.style.border = "1px dashed currentColor";
+          customSwatch.style.boxShadow = "none";
+        }
+      }
+    }
+
+    function queueCustomToolboxButtonSync() {
+      if (pendingToolboxSync) return;
+      pendingToolboxSync = true;
+      requestAnimationFrame(syncCustomToolboxButtons);
+    }
+
+    function ensurePicker() {
+      if (picker) return picker;
+
+      picker = $el("input", {
+        type: "color",
+        parent: document.body,
+        style: {
+          display: "none"
+        }
+      });
+
+      picker.onchange = () => {
+        if (!activeTargets.length || !picker.value) return;
+
+        for (const target of activeTargets) {
+          applyColorToNode(target, picker.value);
+        }
+
+        redrawCanvas();
+        queueCustomToolboxButtonSync();
+      };
+
+      return picker;
+    }
+
+    const observer = new MutationObserver(() => {
+      queueCustomToolboxButtonSync();
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: false
+    });
 
     const onMenuNodeColors = LGraphCanvas.onMenuNodeColors;
     LGraphCanvas.onMenuNodeColors = function (value, options, e, menu, node) {
@@ -113,43 +243,15 @@ app.registerExtension({
                 el.onclick = () => {
                   LiteGraph.closeAllContextMenus();
 
-                  if (!picker) {
-                    picker = $el("input", {
-                      type: "color",
-                      parent: document.body,
-                      style: {
-                        display: "none"
-                      }
-                    });
+                  const targets = getSelectedTargets(node);
+                  if (!targets.length) return;
 
-                    picker.onchange = () => {
-                      if (!activeNode || !picker.value) return;
-
-                      const graphcanvas = LGraphCanvas.active_canvas;
-                      if (
-                        activeNode.constructor !== LiteGraph.LGraphGroup &&
-                        graphcanvas?.selected_nodes &&
-                        Object.keys(graphcanvas.selected_nodes).length > 1
-                      ) {
-                        for (const nodeId in graphcanvas.selected_nodes) {
-                          applyColorToNode(graphcanvas.selected_nodes[nodeId], picker.value);
-                        }
-                      } else {
-                        applyColorToNode(activeNode, picker.value);
-                      }
-
-                      redrawCanvas();
-                    };
-                  }
-
-                  activeNode = null;
+                  ensurePicker();
+                  activeTargets = targets;
                   picker.value = normalizePickerValue(
-                    node?.constructor === LiteGraph.LGraphGroup
-                      ? node?.color
-                      : node?.bgcolor,
+                    getDisplayColorForNode(targets[0]),
                     "#000000"
                   );
-                  activeNode = node;
                   picker.click();
                 };
               }
@@ -170,5 +272,7 @@ app.registerExtension({
 
       return result;
     };
+
+    queueCustomToolboxButtonSync();
   }
 });
