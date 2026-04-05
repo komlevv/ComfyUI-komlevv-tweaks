@@ -5,6 +5,7 @@ import { patchLightThemeCustomNodeColors } from "./komlevv_tweaks_light_theme_cu
 patchLightThemeCustomNodeColors();
 
 const EXTENSION_ID = "komlevv.tweaks.nodeCustomColor";
+const TOOLBOX_PATCH_MARKER = "__komlevvNodeCustomColorToolboxPatched";
 const CUSTOM_SWATCH_BUTTON_SELECTOR = '[data-komlevv-custom-color-button="true"]';
 const CUSTOM_SWATCH_SELECTOR = '[data-komlevv-custom-color-swatch="true"]';
 
@@ -62,25 +63,9 @@ function redrawCanvas() {
   app.graph?.setDirtyCanvas?.(true, true);
 }
 
-function isNodeColorsMenu(menuElement) {
-  const firstEntry = menuElement?.firstElementChild;
-  const text = firstEntry?.textContent ?? "";
-  const content = firstEntry?.value?.content ?? "";
-  return text.includes("No color") || content.includes("No color");
-}
-
-function getSelectedTargets(preferredNode = null) {
+function getSelectedTargets() {
   const graphcanvas = LGraphCanvas.active_canvas;
   const selectedNodes = Object.values(graphcanvas?.selected_nodes ?? {});
-
-  if (preferredNode) {
-    if (preferredNode.constructor !== LiteGraph.LGraphGroup && selectedNodes.length > 1) {
-      return selectedNodes;
-    }
-
-    return [preferredNode];
-  }
-
   if (selectedNodes.length) {
     return selectedNodes;
   }
@@ -111,8 +96,8 @@ app.registerExtension({
   setup() {
     patchLightThemeCustomNodeColors();
 
-    if (LGraphCanvas.__komlevvNodeCustomColorMenuPatched) return;
-    Object.defineProperty(LGraphCanvas, "__komlevvNodeCustomColorMenuPatched", {
+    if (LGraphCanvas[TOOLBOX_PATCH_MARKER]) return;
+    Object.defineProperty(LGraphCanvas, TOOLBOX_PATCH_MARKER, {
       value: true,
       configurable: false,
       enumerable: false,
@@ -126,7 +111,10 @@ app.registerExtension({
     function syncCustomToolboxButtons() {
       pendingToolboxSync = false;
 
+      const selectedTargets = getSelectedTargets();
+      const previewColor = getDisplayColorForNode(selectedTargets[0]);
       const selectButtons = document.querySelectorAll(".selection-toolbox .p-selectbutton");
+
       for (const selectButton of selectButtons) {
         let customButton = selectButton.querySelector(CUSTOM_SWATCH_BUTTON_SELECTOR);
         if (!customButton) {
@@ -172,7 +160,6 @@ app.registerExtension({
         const customSwatch = customButton.querySelector(CUSTOM_SWATCH_SELECTOR);
         if (!customSwatch) continue;
 
-        const previewColor = getDisplayColorForNode(getSelectedTargets()[0]);
         if (previewColor) {
           customSwatch.style.background = normalizePickerValue(previewColor, previewColor);
           customSwatch.style.border = "1px solid rgba(0, 0, 0, 0.18)";
@@ -224,54 +211,6 @@ app.registerExtension({
       subtree: true,
       attributes: false
     });
-
-    const onMenuNodeColors = LGraphCanvas.onMenuNodeColors;
-    LGraphCanvas.onMenuNodeColors = function (value, options, e, menu, node) {
-      const result = onMenuNodeColors.apply(this, arguments);
-
-      requestAnimationFrame(() => {
-        const menus = document.querySelectorAll(".litecontextmenu");
-        for (let i = menus.length - 1; i >= 0; i--) {
-          const targetMenu = menus[i];
-          if (!isNodeColorsMenu(targetMenu)) continue;
-
-          $el(
-            "div.litemenu-entry.submenu",
-            {
-              parent: targetMenu,
-              $: (el) => {
-                el.onclick = () => {
-                  LiteGraph.closeAllContextMenus();
-
-                  const targets = getSelectedTargets(node);
-                  if (!targets.length) return;
-
-                  ensurePicker();
-                  activeTargets = targets;
-                  picker.value = normalizePickerValue(
-                    getDisplayColorForNode(targets[0]),
-                    "#000000"
-                  );
-                  picker.click();
-                };
-              }
-            },
-            [
-              $el("span", {
-                style: {
-                  paddingLeft: "4px",
-                  display: "block"
-                },
-                textContent: "Custom"
-              })
-            ]
-          );
-          break;
-        }
-      });
-
-      return result;
-    };
 
     queueCustomToolboxButtonSync();
   }
