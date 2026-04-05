@@ -1,6 +1,12 @@
 import { app } from "../../scripts/app.js";
 import { $el } from "../../scripts/ui.js";
 import { patchLightThemeCustomNodeColors } from "./komlevv_tweaks_light_theme_custom_node_color_patch.js";
+import {
+  getColorTargetPreviewColor,
+  getSelectedColorTargets,
+  normalizeHexColor,
+  shadeHexColor
+} from "./komlevv_tweaks_node_color_shared.js";
 
 patchLightThemeCustomNodeColors();
 
@@ -8,84 +14,11 @@ const EXTENSION_ID = "komlevv.tweaks.nodeCustomColor";
 const TOOLBOX_PATCH_MARKER = "__komlevvNodeCustomColorToolboxPatched";
 const CUSTOM_SWATCH_BUTTON_SELECTOR = '[data-komlevv-custom-color-button="true"]';
 const CUSTOM_SWATCH_SELECTOR = '[data-komlevv-custom-color-swatch="true"]';
-
-function colorShade(col, amt) {
-  let normalized = String(col ?? "").trim().replace(/^#/, "");
-  if (normalized.length === 3) {
-    normalized = normalized
-      .split("")
-      .map((channel) => channel + channel)
-      .join("");
-  }
-
-  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
-    normalized = "000000";
-  }
-
-  let [r, g, b] = normalized.match(/.{2}/g);
-  [r, g, b] = [
-    parseInt(r, 16) + amt,
-    parseInt(g, 16) + amt,
-    parseInt(b, 16) + amt
-  ];
-
-  r = Math.max(Math.min(255, r), 0).toString(16);
-  g = Math.max(Math.min(255, g), 0).toString(16);
-  b = Math.max(Math.min(255, b), 0).toString(16);
-
-  const rr = (r.length < 2 ? "0" : "") + r;
-  const gg = (g.length < 2 ? "0" : "") + g;
-  const bb = (b.length < 2 ? "0" : "") + b;
-
-  return `#${rr}${gg}${bb}`;
-}
-
-function normalizePickerValue(value, fallback = "#000000") {
-  const source = String(value ?? "").trim().replace(/^#/, "");
-
-  if (/^[0-9a-fA-F]{3}$/.test(source)) {
-    return `#${source
-      .split("")
-      .map((channel) => channel + channel)
-      .join("")
-      .toLowerCase()}`;
-  }
-
-  if (/^[0-9a-fA-F]{6}$/.test(source)) {
-    return `#${source.toLowerCase()}`;
-  }
-
-  return normalizePickerValue(fallback, "#000000");
-}
+const TOOLBOX_SELECT_BUTTON_SELECTOR = ".selection-toolbox .p-selectbutton";
 
 function redrawCanvas() {
   app.canvas?.setDirty?.(true, true);
   app.graph?.setDirtyCanvas?.(true, true);
-}
-
-function isColorTarget(item) {
-  return item instanceof LiteGraph.LGraphNode || item instanceof LiteGraph.LGraphGroup;
-}
-
-function getSelectedTargets() {
-  const graphcanvas = LGraphCanvas.active_canvas;
-  const selectedItems = [...(graphcanvas?.selectedItems ?? [])].filter(isColorTarget);
-  if (selectedItems.length) {
-    return selectedItems;
-  }
-
-  const selectedNodes = Object.values(graphcanvas?.selected_nodes ?? {});
-  if (selectedNodes.length) {
-    return selectedNodes;
-  }
-
-  const selectedGroup = graphcanvas?.selected_group ?? graphcanvas?.selectedGroup;
-  return selectedGroup ? [selectedGroup] : [];
-}
-
-function getDisplayColorForNode(node) {
-  if (!node) return null;
-  return node instanceof LiteGraph.LGraphGroup ? node.color : node.bgcolor;
 }
 
 function applyColorToNode(node, pickerValue) {
@@ -94,10 +27,37 @@ function applyColorToNode(node, pickerValue) {
   if (node instanceof LiteGraph.LGraphGroup) {
     node.color = pickerValue;
   } else {
-    const shadedTitleColor = colorShade(pickerValue, 20);
-    node.color = normalizePickerValue(shadedTitleColor, shadedTitleColor);
-    node.bgcolor = normalizePickerValue(pickerValue, pickerValue);
+    node.color = shadeHexColor(pickerValue, 20);
+    node.bgcolor = normalizeHexColor(pickerValue, pickerValue);
   }
+}
+
+function createCustomSwatch() {
+  const swatch = document.createElement("span");
+  swatch.dataset.komlevvCustomColorSwatch = "true";
+  swatch.style.display = "block";
+  swatch.style.width = "0.9rem";
+  swatch.style.height = "0.9rem";
+  swatch.style.borderRadius = "9999px";
+  swatch.style.boxSizing = "border-box";
+  return swatch;
+}
+
+function getToolboxButtonClassName(selectButton) {
+  const templateButton = selectButton.querySelector("button");
+  if (!templateButton?.className) {
+    return "p-button p-component";
+  }
+
+  return templateButton.className
+    .split(/\s+/)
+    .filter(
+      (className) =>
+        className &&
+        className !== "p-highlight" &&
+        className !== "p-togglebutton-checked"
+    )
+    .join(" ");
 }
 
 app.registerExtension({
@@ -120,48 +80,37 @@ app.registerExtension({
     function syncCustomToolboxButtons() {
       pendingToolboxSync = false;
 
-      const selectedTargets = getSelectedTargets();
-      const previewColor = getDisplayColorForNode(selectedTargets[0]);
-      const selectButtons = document.querySelectorAll(".selection-toolbox .p-selectbutton");
+      const selectedTargets = getSelectedColorTargets();
+      const previewColor = getColorTargetPreviewColor(selectedTargets[0]);
+      const selectButtons = document.querySelectorAll(TOOLBOX_SELECT_BUTTON_SELECTOR);
 
       for (const selectButton of selectButtons) {
         let customButton = selectButton.querySelector(CUSTOM_SWATCH_BUTTON_SELECTOR);
         if (!customButton) {
-          const templateButton = selectButton.querySelector("button");
-          if (!templateButton) continue;
-
-          customButton = templateButton.cloneNode(true);
+          customButton = document.createElement("button");
+          customButton.type = "button";
           customButton.dataset.komlevvCustomColorButton = "true";
+          customButton.className = getToolboxButtonClassName(selectButton);
           customButton.setAttribute("title", "Custom");
           customButton.setAttribute("aria-label", "Custom");
-          customButton.classList.remove("p-highlight", "p-togglebutton-checked");
-          customButton.removeAttribute("aria-pressed");
-          customButton.removeAttribute("data-p-highlight");
 
-          const customSwatch = document.createElement("span");
-          customSwatch.dataset.komlevvCustomColorSwatch = "true";
-          customSwatch.style.display = "block";
-          customSwatch.style.width = "0.9rem";
-          customSwatch.style.height = "0.9rem";
-          customSwatch.style.borderRadius = "9999px";
-          customSwatch.style.boxSizing = "border-box";
-
-          customButton.replaceChildren(customSwatch);
-          customButton.onclick = (event) => {
+          const customSwatch = createCustomSwatch();
+          customButton.append(customSwatch);
+          customButton.addEventListener("click", (event) => {
             event.preventDefault();
             event.stopPropagation();
 
-            const targets = getSelectedTargets();
+            const targets = getSelectedColorTargets();
             if (!targets.length) return;
 
             ensurePicker();
             activeTargets = targets;
-            picker.value = normalizePickerValue(
-              getDisplayColorForNode(targets[0]),
+            picker.value = normalizeHexColor(
+              getColorTargetPreviewColor(targets[0]),
               "#000000"
             );
             picker.click();
-          };
+          });
 
           selectButton.append(customButton);
         }
@@ -170,7 +119,7 @@ app.registerExtension({
         if (!customSwatch) continue;
 
         if (previewColor) {
-          customSwatch.style.background = normalizePickerValue(previewColor, previewColor);
+          customSwatch.style.background = normalizeHexColor(previewColor, previewColor);
           customSwatch.style.border = "1px solid rgba(0, 0, 0, 0.18)";
           customSwatch.style.boxShadow = "inset 0 0 0 1px rgba(255, 255, 255, 0.22)";
         } else {

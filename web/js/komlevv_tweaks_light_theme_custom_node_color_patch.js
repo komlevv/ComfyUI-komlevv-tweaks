@@ -1,4 +1,8 @@
-import { LIGHT_THEME_PRESET_BGCOLORS } from "./komlevv_tweaks_light_theme_preset_colors.js";
+import { LIGHT_THEME_PRESET_COLORS } from "./komlevv_tweaks_light_theme_preset_colors.js";
+import {
+  getColorTargetPreviewColor,
+  getSelectedColorTargets
+} from "./komlevv_tweaks_node_color_shared.js";
 
 /**
  * Shared frontend patch for ComfyUI light-theme explicit color rendering.
@@ -37,22 +41,9 @@ const NODE_PATCH_MARKER = "__komlevvCustomNodeColorLightThemePatched";
 const TOOLBOX_PATCH_MARKER = "__komlevvLightThemeToolboxPreviewPatched";
 const ORIGINAL_NODE_COLORS_MARKER = "__komlevvOriginalNodeColors";
 const TOOLBOX_SELECTOR = ".selection-toolbox";
+const TOOLBOX_PRESET_ICON_SELECTOR = `${TOOLBOX_SELECTOR} .p-selectbutton [data-testid]`;
 const CURRENT_COLOR_SELECTOR =
   '.selection-toolbox [data-testid="color-picker-current-color"]';
-
-function isGraphNode(item) {
-  const LGraphNodeRef = globalThis?.LiteGraph?.LGraphNode;
-  return Boolean(LGraphNodeRef && item instanceof LGraphNodeRef);
-}
-
-function isGraphGroup(item) {
-  const LGraphGroupRef = globalThis?.LiteGraph?.LGraphGroup;
-  return Boolean(LGraphGroupRef && item instanceof LGraphGroupRef);
-}
-
-function isColorTarget(item) {
-  return isGraphNode(item) || isGraphGroup(item);
-}
 
 function isLightThemeNodeHeuristicActive() {
   const nodeLightness = globalThis?.LiteGraph?.nodeLightness;
@@ -68,32 +59,7 @@ function cloneNodeColors(nodeColors) {
   );
 }
 
-function colorShade(col, amt) {
-  let normalized = String(col ?? "").trim().replace(/^#/, "");
-  if (normalized.length === 3) {
-    normalized = normalized
-      .split("")
-      .map((channel) => channel + channel)
-      .join("");
-  }
-
-  if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
-    normalized = "000000";
-  }
-
-  let [r, g, b] = normalized.match(/.{2}/g);
-  [r, g, b] = [
-    parseInt(r, 16) + amt,
-    parseInt(g, 16) + amt,
-    parseInt(b, 16) + amt
-  ];
-
-  r = Math.max(Math.min(255, r), 0).toString(16);
-  g = Math.max(Math.min(255, g), 0).toString(16);
-  b = Math.max(Math.min(255, b), 0).toString(16);
-
-  return `#${r.padStart(2, "0")}${g.padStart(2, "0")}${b.padStart(2, "0")}`;
-}
+// Preset palette state ------------------------------------------------------
 
 function getOriginalNodeColors() {
   const graphCanvasRef = globalThis?.LGraphCanvas;
@@ -114,13 +80,10 @@ function getOriginalNodeColors() {
 function buildLightThemePresetNodeColors(originalNodeColors) {
   const nextNodeColors = cloneNodeColors(originalNodeColors);
 
-  for (const [name, bgcolor] of Object.entries(LIGHT_THEME_PRESET_BGCOLORS)) {
-    const existing = nextNodeColors[name] ?? {};
+  for (const [name, colorOption] of Object.entries(LIGHT_THEME_PRESET_COLORS)) {
     nextNodeColors[name] = {
-      ...existing,
-      color: colorShade(bgcolor, 20),
-      bgcolor,
-      groupcolor: bgcolor
+      ...(nextNodeColors[name] ?? {}),
+      ...colorOption
     };
   }
 
@@ -137,39 +100,13 @@ function syncPresetNodeColorsForTheme() {
     : cloneNodeColors(originalNodeColors);
 }
 
-function getSelectedTargets() {
-  const graphcanvas = globalThis?.LGraphCanvas?.active_canvas;
-  const selectedItems = [...(graphcanvas?.selectedItems ?? [])].filter(isColorTarget);
-  if (selectedItems.length) {
-    return selectedItems;
-  }
-
-  const selectedNodes = Object.values(graphcanvas?.selected_nodes ?? {}).filter(isGraphNode);
-  if (selectedNodes.length) {
-    return selectedNodes;
-  }
-
-  const selectedGroup = graphcanvas?.selected_group ?? graphcanvas?.selectedGroup;
-  return selectedGroup && isGraphGroup(selectedGroup) ? [selectedGroup] : [];
-}
-
-function getExplicitPreviewColor(target) {
-  if (isGraphGroup(target)) {
-    return target.color ?? null;
-  }
-
-  if (isGraphNode(target)) {
-    return target.bgcolor ?? null;
-  }
-
-  return null;
-}
+// Toolbox preview patch -----------------------------------------------------
 
 function getUniformExplicitPreviewColor() {
-  const targets = getSelectedTargets();
+  const targets = getSelectedColorTargets();
   if (!targets.length) return null;
 
-  const colors = targets.map(getExplicitPreviewColor);
+  const colors = targets.map(getColorTargetPreviewColor);
   const firstColor = colors[0];
   if (firstColor == null) return null;
 
@@ -182,15 +119,16 @@ function syncToolboxPreviewColors() {
   syncPresetNodeColorsForTheme();
 
   const nodeColors = globalThis?.LGraphCanvas?.node_colors ?? {};
-  for (const [name, colorOption] of Object.entries(nodeColors)) {
-    const selector = `${TOOLBOX_SELECTOR} .p-selectbutton [data-testid="${name}"]`;
-    const icons = document.querySelectorAll(selector);
-    for (const icon of icons) {
-      if (colorOption?.bgcolor) {
-        icon.style.color = colorOption.bgcolor;
-      } else {
-        icon.style.removeProperty("color");
-      }
+  const presetIcons = document.querySelectorAll(TOOLBOX_PRESET_ICON_SELECTOR);
+  for (const icon of presetIcons) {
+    const presetName = icon.getAttribute("data-testid");
+    if (!presetName || !(presetName in nodeColors)) continue;
+
+    const colorOption = nodeColors[presetName];
+    if (colorOption?.bgcolor) {
+      icon.style.color = colorOption.bgcolor;
+    } else {
+      icon.style.removeProperty("color");
     }
   }
 
@@ -252,6 +190,8 @@ export function patchLightThemeToolboxPreviewColors() {
   queueSync();
   return true;
 }
+
+// Node rendering bypass -----------------------------------------------------
 
 function definePatchedGetter(target, propertyName, descriptor, shouldBypass) {
   Object.defineProperty(target, propertyName, {
