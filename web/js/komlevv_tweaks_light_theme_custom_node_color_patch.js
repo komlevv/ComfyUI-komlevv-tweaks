@@ -191,13 +191,12 @@ function syncToolboxPreviewColors() {
 
   syncPresetNodeColorsForTheme();
 
-  const isLightThemeActive = isLightThemeNodeHeuristicActive();
   const nodeColors = globalThis?.LGraphCanvas?.node_colors ?? {};
   for (const [name, colorOption] of Object.entries(nodeColors)) {
     const selector = `${TOOLBOX_SELECTOR} .p-selectbutton [data-testid="${name}"]`;
     const icons = document.querySelectorAll(selector);
     for (const icon of icons) {
-      if (isLightThemeActive && colorOption?.bgcolor) {
+      if (colorOption?.bgcolor) {
         icon.style.color = colorOption.bgcolor;
       } else {
         icon.style.removeProperty("color");
