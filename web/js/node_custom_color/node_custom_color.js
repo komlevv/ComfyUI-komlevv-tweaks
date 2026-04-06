@@ -229,10 +229,17 @@ app.registerExtension({
 
       configureColorisForComfy({
         el: picker,
+        theme: "pill",
         alpha: false,
         format: "hex",
-        formatToggle: false,
-        swatchesOnly: false
+        formatToggle: true,
+        clearButton: false,
+        closeButton: false,
+        swatchesOnly: false,
+        swatches: [
+          "#1f8fe5", "#9ad0f5", "#81e36a", "#f5d21f", "#f58a4b", "#e06a6a",
+          "#8e44ad", "#2ecc71", "#3498db", "#f39c12", "#e74c3c", "#95a5a6"
+        ]
       });
 
       picker.addEventListener("input", applyPickerValue);
