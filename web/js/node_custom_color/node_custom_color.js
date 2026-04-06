@@ -80,13 +80,51 @@ app.registerExtension({
     let picker;
     let activeTargets = [];
     let pendingToolboxSync = false;
+    let observer;
+    let observerRoot;
+
+    function getPreferredObserverRoot(selectButton) {
+      const toolbox = selectButton?.closest?.(".selection-toolbox");
+      return toolbox?.parentElement || toolbox || document.body;
+    }
+
+    function setObserverRoot(nextRoot) {
+      const resolvedRoot = nextRoot || document.body;
+      if (observerRoot === resolvedRoot) return;
+
+      observer?.disconnect();
+      observerRoot = resolvedRoot;
+      observer?.observe(observerRoot, {
+        childList: true,
+        subtree: true,
+        attributes: false
+      });
+    }
+
+    function getToolboxQueryRoot() {
+      if (observerRoot instanceof Element || observerRoot instanceof DocumentFragment) {
+        return observerRoot;
+      }
+
+      return document.body;
+    }
 
     function syncCustomToolboxButtons() {
       pendingToolboxSync = false;
 
+      if (observerRoot && observerRoot !== document.body && !document.body.contains(observerRoot)) {
+        setObserverRoot(document.body);
+      }
+
       const selectedTargets = getSelectedColorTargets();
       const previewColor = getColorTargetPreviewColor(selectedTargets[0]);
-      const selectButtons = document.querySelectorAll(TOOLBOX_SELECT_BUTTON_SELECTOR);
+      const selectButtons = getToolboxQueryRoot().querySelectorAll(TOOLBOX_SELECT_BUTTON_SELECTOR);
+
+      if (selectButtons.length) {
+        setObserverRoot(getPreferredObserverRoot(selectButtons[0]));
+      } else if (observerRoot !== document.body) {
+        setObserverRoot(document.body);
+      }
 
       for (const selectButton of selectButtons) {
         let customButton = selectButton.querySelector(CUSTOM_SWATCH_BUTTON_SELECTOR);
@@ -203,15 +241,11 @@ app.registerExtension({
       return picker;
     }
 
-    const observer = new MutationObserver(() => {
+    observer = new MutationObserver(() => {
       queueCustomToolboxButtonSync();
     });
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      attributes: false
-    });
 
+    setObserverRoot(document.body);
     queueCustomToolboxButtonSync();
   }
 });
