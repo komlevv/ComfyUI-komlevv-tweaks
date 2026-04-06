@@ -1,3 +1,4 @@
+import { $el } from "../../../scripts/ui.js";
 import "./coloris.js";
 
 function addStylesheet(url) {
@@ -5,11 +6,12 @@ function addStylesheet(url) {
     url = url.substr(0, url.length - 2) + "css";
   }
 
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.type = "text/css";
-  link.href = url.startsWith("http") ? url : getUrl(url);
-  document.head.appendChild(link);
+  $el("link", {
+    parent: document.head,
+    rel: "stylesheet",
+    type: "text/css",
+    href: url.startsWith("http") ? url : getUrl(url)
+  });
 }
 
 function getUrl(path, baseUrl) {
