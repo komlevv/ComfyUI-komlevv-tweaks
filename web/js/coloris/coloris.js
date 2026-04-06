@@ -361,6 +361,19 @@
     event.stopPropagation();
   }
 
+  function handleDocumentPointerDown(event) {
+    if (!currentEl) {
+      return;
+    }
+
+    const target = event.target;
+    if (picker?.contains(target) || target === currentEl) {
+      return;
+    }
+
+    closePicker();
+  }
+
   function setMarkerPosition(x, y) {
     x = (x < 0) ? 0 : (x > colorAreaDims.width) ? colorAreaDims.width : x;
     y = (y < 0) ? 0 : (y > colorAreaDims.height) ? colorAreaDims.height : y;
@@ -674,9 +687,7 @@
       document.removeEventListener('mousemove', moveMarker);
     });
 
-    addListener(document, 'mousedown', () => {
-      closePicker();
-    });
+    document.addEventListener('pointerdown', handleDocumentPointerDown, true);
 
     addListener(colorArea, 'click', moveMarker);
     addListener(hueSlider, 'input', setHue);
