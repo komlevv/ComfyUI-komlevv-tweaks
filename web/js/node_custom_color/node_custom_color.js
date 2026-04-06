@@ -1,5 +1,9 @@
 import { app } from "../../../scripts/app.js";
 import { $el } from "../../../scripts/ui.js";
+import {
+  configureColorisForComfy,
+  syncColorisThemeMode
+} from "../coloris/coloris_shared.js";
 import { patchLightThemeCustomNodeColors } from "../common/light_theme_custom_node_color_patch.js";
 import {
   getColorTargetPreviewColor,
@@ -103,13 +107,19 @@ app.registerExtension({
             const targets = getSelectedColorTargets();
             if (!targets.length) return;
 
-            ensurePicker();
+            const colorPicker = ensurePicker();
             activeTargets = targets;
-            picker.value = normalizeHexColor(
+            colorPicker.value = normalizeHexColor(
               getColorTargetPreviewColor(targets[0]),
               "#000000"
             );
-            picker.click();
+            syncColorisThemeMode();
+            positionPickerAnchor(colorPicker, customButton);
+            colorPicker.dispatchEvent(new MouseEvent("click", {
+              bubbles: true,
+              cancelable: true,
+              view: window
+            }));
           });
 
           selectButton.append(customButton);
@@ -136,27 +146,59 @@ app.registerExtension({
       requestAnimationFrame(syncCustomToolboxButtons);
     }
 
+    function positionPickerAnchor(anchor, button) {
+      const rect = button.getBoundingClientRect();
+      anchor.style.left = `${rect.left}px`;
+      anchor.style.top = `${rect.top}px`;
+      anchor.style.width = `${Math.max(rect.width, 1)}px`;
+      anchor.style.height = `${Math.max(rect.height, 1)}px`;
+    }
+
+    function applyPickerValue() {
+      if (!activeTargets.length || !picker?.value) return;
+
+      for (const target of activeTargets) {
+        applyColorToNode(target, picker.value);
+      }
+
+      redrawCanvas();
+      queueCustomToolboxButtonSync();
+    }
+
     function ensurePicker() {
       if (picker) return picker;
 
       picker = $el("input", {
-        type: "color",
+        type: "text",
         parent: document.body,
+        dataset: {
+          coloris: "true",
+          komlevvColorisAnchor: "true"
+        },
         style: {
-          display: "none"
+          position: "fixed",
+          left: "0px",
+          top: "0px",
+          width: "1px",
+          height: "1px",
+          opacity: 0,
+          pointerEvents: "none",
+          border: 0,
+          padding: 0,
+          margin: 0
         }
       });
 
-      picker.onchange = () => {
-        if (!activeTargets.length || !picker.value) return;
+      configureColorisForComfy({
+        el: picker,
+        alpha: false,
+        format: "hex",
+        formatToggle: false,
+        swatchesOnly: false
+      });
 
-        for (const target of activeTargets) {
-          applyColorToNode(target, picker.value);
-        }
-
-        redrawCanvas();
-        queueCustomToolboxButtonSync();
-      };
+      picker.addEventListener("input", applyPickerValue);
+      picker.addEventListener("change", applyPickerValue);
 
       return picker;
     }
