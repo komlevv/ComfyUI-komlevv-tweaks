@@ -33,6 +33,14 @@ This copy is based on upstream Coloris, but some features were deliberately remo
 
 These removals were made to keep the vendor file leaner and more suitable for the desktop-browser ComfyUI environment used by this project.
 
+## Lazy initialization behavior
+
+Unlike upstream, this vendored copy no longer creates picker DOM on module load.
+
+The file may still be loaded automatically by ComfyUI because it lives under `web/js`, but the picker UI is only initialized when `Coloris.init()` or `Coloris.set(...)` is first used through the shared helper layer.
+
+This avoids creating popup DOM at page startup in scenarios where the custom color picker is never opened.
+
 ## What is intentionally kept
 
 The following behavior from upstream Coloris is still expected to exist here:
@@ -51,6 +59,7 @@ It is responsible for:
 
 - loading `coloris.css` from JS in the same style used elsewhere in ComfyUI custom frontend code,
 - exposing helpers such as `getColoris()`,
+- ensuring lazy Coloris initialization,
 - mapping ComfyUI light/dark state to Coloris `themeMode`.
 
 This separation is intentional: repository-specific logic should live in `coloris_shared.js` as much as possible, while `coloris.js` should stay structurally close to upstream.

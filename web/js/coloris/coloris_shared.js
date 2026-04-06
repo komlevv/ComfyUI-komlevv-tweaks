@@ -37,8 +37,14 @@ export function getColoris() {
   return globalThis.Coloris;
 }
 
-export function configureColorisForComfy(options = {}) {
+export function ensureColorisInitialized() {
   const Coloris = getColoris();
+  Coloris?.init?.();
+  return Coloris;
+}
+
+export function configureColorisForComfy(options = {}) {
+  const Coloris = ensureColorisInitialized();
   Coloris?.set?.({
     themeMode: getComfyColorisThemeMode(),
     ...options

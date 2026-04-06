@@ -43,7 +43,18 @@
     }
   };
 
+  function ensureInit() {
+    if (picker) {
+      return picker;
+    }
+
+    init();
+    return picker;
+  }
+
   function configure(options) {
+    ensureInit();
+
     if (typeof options !== 'object') {
       return;
     }
@@ -186,6 +197,7 @@
     currentEl = event.target;
     oldColor = currentEl.value;
     currentFormat = getColorFormatFromStr(oldColor);
+    picker.style.display = 'flex';
     picker.classList.add('clr-open');
 
     updatePickerPosition();
@@ -257,6 +269,7 @@
       });
 
       picker.classList.remove('clr-open');
+      picker.style.display = 'none';
       prevEl.dispatchEvent(new Event('close', { bubbles: false }));
 
       if (settings.focusInput) {
@@ -559,6 +572,7 @@
     picker = document.createElement('div');
     picker.setAttribute('id', 'clr-picker');
     picker.className = 'clr-picker';
+    picker.style.display = 'none';
     picker.innerHTML =
       `<input id="clr-color-value" name="clr-color-value" class="clr-color" type="text" value="" spellcheck="false" aria-label="${settings.a11y.input}">` +
       `<div id="clr-color-area" class="clr-gradient" role="application" aria-label="${settings.a11y.instruction}">` +
@@ -605,8 +619,6 @@
     hueMarker = getEl('clr-hue-marker');
     alphaSlider = getEl('clr-alpha-slider');
     alphaMarker = getEl('clr-alpha-marker');
-
-    bindFields(settings.el);
 
     addListener(picker, 'mousedown', event => {
       event.stopPropagation();
@@ -702,6 +714,7 @@
 
   window.Coloris = (() => {
     const methods = {
+      init: ensureInit,
       set: configure,
       close: closePicker,
       updatePosition: updatePickerPosition,
@@ -711,6 +724,7 @@
     function Coloris(options) {
       DOMReady(() => {
         if (options) {
+          ensureInit();
           if (typeof options === 'string') {
             bindFields(options);
           } else {
@@ -728,6 +742,4 @@
 
     return Coloris;
   })();
-
-  DOMReady(init);
 })(window, document, Math);
