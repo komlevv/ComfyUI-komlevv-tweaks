@@ -1,5 +1,5 @@
-import { app } from "../../scripts/app.js";
-import { makeKomlevvTweaksCategory } from "./common.js";
+import { app } from "../../../scripts/app.js";
+import { makeKomlevvTweaksCategory } from "../common/common.js";
 
 const EXTENSION_ID = "komlevv.tweaks.linkStyle";
 

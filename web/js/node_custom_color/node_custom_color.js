@@ -1,12 +1,12 @@
-import { app } from "../../scripts/app.js";
-import { $el } from "../../scripts/ui.js";
-import { patchLightThemeCustomNodeColors } from "./light_theme_custom_node_color_patch.js";
+import { app } from "../../../scripts/app.js";
+import { $el } from "../../../scripts/ui.js";
+import { patchLightThemeCustomNodeColors } from "../common/light_theme_custom_node_color_patch.js";
 import {
   getColorTargetPreviewColor,
   getSelectedColorTargets,
   normalizeHexColor,
   shadeHexColor
-} from "./node_color_shared.js";
+} from "../common/node_color_shared.js";
 
 patchLightThemeCustomNodeColors();
 

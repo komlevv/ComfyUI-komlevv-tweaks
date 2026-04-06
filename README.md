@@ -31,7 +31,10 @@ Current tweak groups:
 ## Repository layout
 
 - `py/` — Python backend modules and future custom nodes
-- `web/js/` — frontend extensions and shared JS helpers
+- `web/js/common/` — shared JS helpers
+- `web/js/canvas/` — Canvas Style frontend extension
+- `web/js/link_style/` — Link Style frontend extension
+- `web/js/node_custom_color/` — Custom Node Colors frontend extension
 
 ## Included tweaks
 
