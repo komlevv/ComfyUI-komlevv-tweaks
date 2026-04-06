@@ -26,6 +26,8 @@ This copy is based on upstream Coloris, but some features were deliberately remo
 - virtual instances support,
 - custom parent container support,
 - input wrapping / preview field support,
+- inline mode,
+- keyboard navigation / keyboard shortcuts,
 - touch event support,
 - legacy browser fallbacks / polyfills.
 
@@ -38,8 +40,6 @@ The following behavior from upstream Coloris is still expected to exist here:
 - swatches,
 - alpha support,
 - format switching (`hex`, `rgb`, `hsl`),
-- keyboard navigation,
-- inline mode,
 - theme / themeMode handling,
 - popup positioning relative to the input element.
 
