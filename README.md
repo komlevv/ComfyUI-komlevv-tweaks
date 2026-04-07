@@ -35,6 +35,21 @@ Current tweak groups:
 - `web/js/canvas/` — Canvas Style frontend extension
 - `web/js/link_style/` — Link Style frontend extension
 - `web/js/node_custom_color/` — Custom Node Colors frontend extension
+- `web/js/coloris/` — vendored Coloris picker and shared integration glue
+- `docs/` — agent-facing project context, task docs, tool playbooks, and decisions
+
+## Agent docs
+
+This repository ships with an agent-facing multi-file context system.
+
+Start here:
+
+- `AGENTS.md` — canonical working rules and anti-drift guardrails
+- `CLAUDE.md` — thin Claude-specific entrypoint
+- `docs/INDEX.md` — document registry and read order
+
+For current implementation details, treat the code and the docs under `docs/` as the technical source of truth.
+The root `README.md` is a human-facing overview and may intentionally stay lighter than the agent docs.
 
 ## Included tweaks
 
@@ -101,7 +116,7 @@ Custom Node Colors adds a `Custom` entry into the standard ComfyUI node/group co
 Current behavior:
 
 - Hooks the built-in `Node Colors` context menu through `LGraphCanvas.onMenuNodeColors`
-- Opens a native browser color picker
+- Opens a Coloris-based popup color picker
 - Applies custom colors directly to the selected node or group
 - For nodes, stores the picked color in `bgcolor` and applies a slightly lighter derived `color` to match the original pythongosssss behavior
 - For groups, stores the picked color directly in `group.color`
