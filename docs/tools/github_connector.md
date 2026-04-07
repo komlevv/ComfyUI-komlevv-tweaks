@@ -4,7 +4,7 @@
 - Scope: operational workflow for reading from and writing to GitHub through the connector
 - Applies to: GitHub connector sessions for this repository
 - Source of truth level: tool-playbook
-- Last verified commit: 56a0f139c8df934a692d9825c98ee8c6226e15b5
+- Last verified commit: bd12b8ce4784561660935fd160d112ec3d6cb92d
 - Update when: the connector workflow changes, branch creation flow changes, or new connector failure modes are learned
 - Supersedes: `github-connector.md` chat handoff notes
 - Superseded by: none
@@ -15,6 +15,17 @@ This file documents the working GitHub connector strategy for this repository.
 
 Use it as an explicit SOP.
 Do not improvise a new write workflow unless the documented one clearly cannot work.
+
+## Early gating rule
+
+For repository tasks that may require GitHub reads or writes:
+
+1. check connector availability first
+2. do that before deeper code investigation, implementation planning, or repository exploration
+3. if the connector is not working or the result is ambiguous, ask the human whether to continue without it
+4. do not continue repository work until the human explicitly confirms that fallback
+
+This rule exists to prevent wasted effort in sessions that cannot actually use the intended repository access path.
 
 ## Core model
 
@@ -38,6 +49,18 @@ Think in terms of:
 
 Do not think of it as a local git shell.
 Do not think of it as a fragile line-patch editor.
+
+## Canonical connector check
+
+The early availability check should be lightweight.
+
+Prefer a simple connector capability check such as:
+
+- listing connector resources
+- calling a lightweight authenticated GitHub action such as profile retrieval
+- otherwise proving that the connector is present and responsive before code work begins
+
+Do not postpone this check until after code analysis.
 
 ## Canonical write workflow
 
@@ -108,6 +131,7 @@ When the workflow fails, classify the failed step precisely:
 - commit creation failure
 - ref update failure
 - verified permission failure
+- early connector availability failure
 
 Report the failed step, not a vague statement like "GitHub connector is unstable".
 
@@ -210,6 +234,7 @@ Practical conclusion:
 - read before writing
 - do not overuse force updates unless the user explicitly wants history rewritten
 - do not push the user toward local git after one connector failure if the SOP was not yet exhausted
+- do not continue repository work after an early connector availability failure unless the human explicitly approved that fallback
 
 ## Reporting contract
 
