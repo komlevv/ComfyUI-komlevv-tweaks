@@ -54,3 +54,11 @@ A fix must avoid regressing:
 ## Deliverable expectation
 
 A focused fix, not a global color pipeline rewrite.
+
+Current branch implementation adds an explicit canvas background override workflow with:
+
+- enable/disable toggle
+- separate dark-theme and light-theme color values
+- Coloris-backed picker inputs for those values
+
+while keeping node/group custom color and toolbox preview behavior untouched.
