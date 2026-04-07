@@ -8,7 +8,7 @@ This is the canonical agent operating manual for this repository.
 - Scope: repository-wide working rules, source-of-truth precedence, context maintenance, and anti-drift guardrails
 - Applies to: entire repository
 - Source of truth level: root-rule
-- Last verified commit: bd12b8ce4784561660935fd160d112ec3d6cb92d
+- Last verified commit: 783ce6bc055d2a57e151459710e91735a9351030
 - Update when: workflow rules, context governance, source-of-truth precedence, document lifecycle, or completion requirements change
 - Supersedes: none
 - Superseded by: none
@@ -74,12 +74,14 @@ For any coding session:
 10. read the current code before proposing or applying changes
 11. read the relevant active task doc if one exists
 12. read the relevant tool playbook if the workflow depends on one
+13. after the first working implementation pass, run a self-review before treating the task as complete
+14. explicitly evaluate whether the current solution is good enough and whether it is performant enough for the current scope
 
 For any GitHub connector write session:
 
-13. read `docs/tools/github_connector.md`
-14. follow that SOP exactly
-15. do not conclude that the connector cannot write after a single failed attempt
+15. read `docs/tools/github_connector.md`
+16. follow that SOP exactly
+17. do not conclude that the connector cannot write after a single failed attempt
 
 ## Repository-specific guardrails
 
@@ -93,6 +95,17 @@ When the task is about this repository and may require GitHub access:
 - ask the human whether to continue without a working connector and wait for explicit confirmation before proceeding
 
 This rule exists to avoid wasting time on repository work in a session that cannot actually read or write through the intended path.
+
+### Re-review the first implementation pass
+
+After producing the first working implementation or first substantive proposed solution:
+
+- pause and check whether the work is actually good
+- look for unnecessary complexity, accidental regressions, and places where the patch can be made leaner
+- explicitly evaluate performance implications for the current scope, even if the solution is functionally correct
+- if a leaner or faster solution is clearly better, prefer that before concluding the task
+
+This rule exists to prevent agents from stopping at the first merely-working answer when a cleaner or more performant answer is available with modest additional effort.
 
 ### Work inside the current custom node structure
 
@@ -147,6 +160,7 @@ Do not treat it as authoritative for active drift-sensitive details if code or d
 - Do not conclude GitHub connector write access is unavailable after one failed attempt.
 - Do not ask the user to manually apply code if the documented connector workflow should still be able to do the write.
 - Do not continue repository code work after an early connector failure unless the human explicitly confirmed that fallback.
+- Do not stop at the first working implementation without re-checking solution quality and performance.
 - Do not leave architecture, compatibility, or workflow docs stale after a non-trivial change.
 
 ## Context file classes
@@ -213,6 +227,7 @@ Do not leave multiple competing active docs for the same task.
 Before finishing non-trivial work, the agent must verify all of the following:
 
 - the code change is complete
+- after the first implementation pass, the solution was re-reviewed for quality and performance
 - the narrowest relevant context file was updated if needed
 - `docs/INDEX.md` was updated if a new doc was added
 - replaced task or handoff docs were marked superseded or archived

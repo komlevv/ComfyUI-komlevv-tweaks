@@ -18,3 +18,4 @@ Additional Claude-specific notes:
 - If docs and code disagree, update the doc rather than carrying stale assumptions forward.
 - For repository tasks that may depend on GitHub access, verify the connector early.
 - If the connector is not working or the result is ambiguous, ask the human whether to continue without it before moving into deeper code work.
+- After the first working implementation pass, re-review the solution and explicitly check whether it is good enough and performant enough for the scope.

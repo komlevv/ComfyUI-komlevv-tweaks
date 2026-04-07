@@ -4,7 +4,7 @@
 - Scope: registry of agent-facing docs, read order, lifecycle, and active task references
 - Applies to: `docs/**`, root instruction files, nested agent docs
 - Source of truth level: registry
-- Last verified commit: bd12b8ce4784561660935fd160d112ec3d6cb92d
+- Last verified commit: 783ce6bc055d2a57e151459710e91735a9351030
 - Update when: a new doc is added, a doc is superseded or archived, read order changes, or a different task becomes active
 - Supersedes: none
 - Superseded by: none
@@ -39,6 +39,7 @@ Use it to determine:
 - relevant nested `web/js/**/AGENTS.md`
 - `docs/PROJECT_ARCHITECTURE.md`
 - `docs/COMPATIBILITY.md`
+- after the first working pass, re-review the solution quality and performance before concluding the task
 
 #### GitHub connector read/write workflow
 
