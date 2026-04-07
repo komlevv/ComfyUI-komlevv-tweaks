@@ -193,10 +193,11 @@ app.registerExtension({
       anchor.style.height = `${Math.max(rect.height, 1)}px`;
     }
 
-    function applyPickerValue() {
-      if (!activeTargets.length || !picker?.value) return;
+    function applyPickerValue(rawColor = picker?.value) {
+      if (!activeTargets.length || !rawColor) return;
 
-      const pickerHexValue = normalizeColorToHex(picker.value, "#000000");
+      const pickerHexValue = normalizeColorToHex(rawColor, "#000000");
+      picker.value = pickerHexValue;
       for (const target of activeTargets) {
         applyColorToNode(target, pickerHexValue);
       }
@@ -238,14 +239,17 @@ app.registerExtension({
         clearButton: false,
         closeButton: false,
         swatchesOnly: false,
+        onChange: (color) => {
+          applyPickerValue(color);
+        },
         swatches: [
           "#1f8fe5", "#9ad0f5", "#81e36a", "#f5d21f", "#f58a4b", "#e06a6a",
           "#8e44ad", "#2ecc71", "#3498db", "#f39c12", "#e74c3c", "#95a5a6"
         ]
       });
 
-      picker.addEventListener("input", applyPickerValue);
-      picker.addEventListener("change", applyPickerValue);
+      picker.addEventListener("input", () => applyPickerValue());
+      picker.addEventListener("change", () => applyPickerValue());
 
       return picker;
     }
