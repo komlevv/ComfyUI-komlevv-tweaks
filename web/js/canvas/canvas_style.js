@@ -96,10 +96,17 @@ function ensureColorisSettingsPatch() {
 
   configureColorisForComfy({
     el: selector,
+    theme: "pill",
     alpha: false,
     format: "hex",
     formatToggle: true,
-    swatchesOnly: false
+    clearButton: false,
+    closeButton: false,
+    swatchesOnly: false,
+    swatches: [
+      "#1f8fe5", "#9ad0f5", "#81e36a", "#f5d21f", "#f58a4b", "#e06a6a",
+      "#8e44ad", "#2ecc71", "#3498db", "#f39c12", "#e74c3c", "#95a5a6"
+    ]
   });
 
   if (globalThis[COLORIS_SETTINGS_PATCH_MARKER]) return;
@@ -239,6 +246,14 @@ function resetCustomBackgroundColorsToDefault() {
   );
 }
 
+
+function applyCustomBackgroundColorReset(value) {
+  if (!Boolean(value)) return;
+
+  resetCustomBackgroundColorsToDefault();
+  setSettingValueIfAvailable(SETTING_ID_CUSTOM_BACKGROUND_COLOR_RESET, false);
+}
+
 function applyAllSettings() {
   ensureColorisSettingsPatch();
   syncColorisThemeMode();
@@ -313,10 +328,10 @@ const extension = {
       ),
       name: "Reset custom background colors to default",
       tooltip:
-        "Resets both dark and light custom background colors to their default values.",
-      type: "button",
+        "Toggle to reset both dark and light custom background colors to defaults.",
+      type: "boolean",
       defaultValue: false,
-      onChange: () => resetCustomBackgroundColorsToDefault()
+      onChange: (value) => applyCustomBackgroundColorReset(value)
     }
   ],
   setup() {

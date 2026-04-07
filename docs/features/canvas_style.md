@@ -25,14 +25,14 @@ The current implementation adds the following settings:
 - `Custom background color enabled`
 - `Custom background color (dark theme)`
 - `Custom background color (light theme)`
-- `Reset custom background colors to default`
+- `Reset custom background colors to default` (boolean toggle-style reset control)
 
 It uses a `drawBackCanvas` patch to:
 
 - suppress LiteGraph background pattern rendering and low-zoom darkening fill when requested
 - override `clear_background_color` with a custom value when custom canvas colors are enabled
 - choose dark/light custom color by current ComfyUI light-theme heuristic state
-- provide one-click reset of both custom background colors back to defaults
+- provide reset-to-default behavior for both custom background colors through the settings toggle control
 
 The goal is visual consistency across zoom levels and predictable WYSIWYG background color in both dark and light themes.
 
