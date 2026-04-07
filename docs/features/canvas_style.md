@@ -23,8 +23,8 @@ The current implementation adds the following settings:
 
 - `Force hide background pattern`
 - `Custom background color enabled`
-- `Custom background color (dark theme)`
-- `Custom background color (light theme)`
+- `Custom background color (dark theme)` (text input with adjacent Coloris launcher button)
+- `Custom background color (light theme)` (text input with adjacent Coloris launcher button)
 - `Reset custom background colors to default` (boolean toggle-style reset control)
 
 It uses a `drawBackCanvas` patch to:
@@ -33,6 +33,7 @@ It uses a `drawBackCanvas` patch to:
 - override `clear_background_color` with a custom value when custom canvas colors are enabled
 - choose dark/light custom color by current ComfyUI light-theme heuristic state
 - provide reset-to-default behavior for both custom background colors through the settings toggle control
+- use Coloris launcher buttons next to those text fields to avoid ComfyUI settings-native color picker interception
 
 The goal is visual consistency across zoom levels and predictable WYSIWYG background color in both dark and light themes.
 

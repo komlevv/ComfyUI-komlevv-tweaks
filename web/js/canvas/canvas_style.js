@@ -26,6 +26,7 @@ const DEFAULT_CUSTOM_BACKGROUND_COLOR_LIGHT = "#d8d8d8";
 
 const PATCH_STATE_KEY = "__komlevvTweaksCanvasStylePatchState";
 const COLORIS_SETTINGS_PATCH_MARKER = "__komlevvCanvasStyleColorisPatchInstalled";
+const COLORIS_BUTTON_MARKER = "komlevvCanvasColorisButton";
 
 const currentSettings = {
   forceHideBackgroundPattern: DEFAULT_FORCE_HIDE_BACKGROUND_PATTERN,
@@ -80,15 +81,57 @@ function getPatchState() {
   return globalThis[PATCH_STATE_KEY];
 }
 
-function getColorInputSelector() {
-  const settingIds = [
+function getColorSettingIds() {
+  return [
     SETTING_ID_CUSTOM_BACKGROUND_COLOR_DARK,
     SETTING_ID_CUSTOM_BACKGROUND_COLOR_LIGHT
   ];
+}
 
-  return settingIds
+function getColorInputSelector() {
+  return getColorSettingIds()
     .map((settingId) => `[id="${settingId}"]`)
     .join(", ");
+}
+
+function ensureColorisLaunchButton(input) {
+  if (!(input instanceof HTMLInputElement) || !input.parentElement) return;
+
+  const existingButton = input.parentElement.querySelector(
+    `[data-${COLORIS_BUTTON_MARKER}="true"]`
+  );
+  if (existingButton) return;
+
+  const button = document.createElement("button");
+  button.type = "button";
+  button.dataset[COLORIS_BUTTON_MARKER] = "true";
+  button.textContent = "🎨";
+  button.title = "Open Coloris";
+  button.style.marginLeft = "0.35rem";
+  button.style.padding = "0.1rem 0.4rem";
+  button.style.lineHeight = "1";
+
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    syncColorisThemeMode();
+    input.dispatchEvent(new MouseEvent("click", {
+      bubbles: true,
+      cancelable: true,
+      view: window
+    }));
+    input.focus();
+  });
+
+  input.parentElement.append(button);
+}
+
+function syncColorisLaunchButtons() {
+  for (const settingId of getColorSettingIds()) {
+    const input = document.getElementById(settingId);
+    ensureColorisLaunchButton(input);
+  }
 }
 
 function ensureColorisSettingsPatch() {
@@ -109,6 +152,8 @@ function ensureColorisSettingsPatch() {
     ]
   });
 
+  syncColorisLaunchButtons();
+
   if (globalThis[COLORIS_SETTINGS_PATCH_MARKER]) return;
 
   document.addEventListener("focusin", (event) => {
@@ -118,8 +163,17 @@ function ensureColorisSettingsPatch() {
     syncColorisThemeMode();
   });
 
+  const observer = new MutationObserver(() => {
+    syncColorisLaunchButtons();
+  });
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: false
+  });
+
   Object.defineProperty(globalThis, COLORIS_SETTINGS_PATCH_MARKER, {
-    value: true,
+    value: observer,
     configurable: false,
     enumerable: false,
     writable: false
@@ -217,7 +271,6 @@ function applyCustomBackgroundColorLight(value) {
   redrawCanvas();
 }
 
-
 function setSettingValueIfAvailable(settingId, value) {
   if (typeof app.ui?.settings?.setSettingValue === "function") {
     app.ui.settings.setSettingValue(settingId, value);
@@ -245,7 +298,6 @@ function resetCustomBackgroundColorsToDefault() {
     DEFAULT_CUSTOM_BACKGROUND_COLOR_LIGHT
   );
 }
-
 
 function applyCustomBackgroundColorReset(value) {
   if (!Boolean(value)) return;
@@ -298,7 +350,7 @@ const extension = {
       ),
       name: "Custom background color (dark theme)",
       tooltip: "Canvas clear color override used in dark theme mode.",
-      type: "color",
+      type: "text",
       attrs: {
         "data-coloris": "true"
       },
@@ -313,7 +365,7 @@ const extension = {
       ),
       name: "Custom background color (light theme)",
       tooltip: "Canvas clear color override used in light theme mode.",
-      type: "color",
+      type: "text",
       attrs: {
         "data-coloris": "true"
       },
