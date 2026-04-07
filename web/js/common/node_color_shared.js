@@ -20,6 +20,12 @@ export function normalizeHexColor(value, fallback = "#000000") {
   return "#000000";
 }
 
+function rgbaChannelsToHex(channels) {
+  return `#${channels
+    .map((channel) => Number(channel).toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
 function tryParseCssColorToHex(value) {
   const source = String(value ?? "").trim();
   if (!source || !COLOR_PARSE_CONTEXT) {
@@ -40,9 +46,14 @@ function tryParseCssColorToHex(value) {
     return null;
   }
 
-  const resolved = COLOR_PARSE_CONTEXT.fillStyle;
+  const resolved = String(COLOR_PARSE_CONTEXT.fillStyle ?? "").trim();
   if (resolved === sentinel && source.toLowerCase() !== sentinel) {
     return null;
+  }
+
+  const normalizedResolvedHex = normalizeHexColor(resolved, "");
+  if (normalizedResolvedHex !== "#000000" || resolved.toLowerCase() === "#000000" || resolved.toLowerCase() === "#000") {
+    return normalizedResolvedHex;
   }
 
   const match = resolved.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
@@ -50,10 +61,7 @@ function tryParseCssColorToHex(value) {
     return null;
   }
 
-  return `#${match
-    .slice(1, 4)
-    .map((channel) => Number(channel).toString(16).padStart(2, "0"))
-    .join("")}`;
+  return rgbaChannelsToHex(match.slice(1, 4));
 }
 
 export function normalizeColorToHex(value, fallback = "#000000") {
