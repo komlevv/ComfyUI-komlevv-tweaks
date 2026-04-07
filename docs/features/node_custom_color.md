@@ -27,18 +27,21 @@ The current implementation:
 - creates and reuses one hidden text input anchor for the picker
 - launches the Coloris popup near the toolbox custom button
 - applies picked values live to current targets
+- normalizes picker output into hex before the node/group apply pipeline so UI format toggles do not change stored/apply behavior
 - updates the current swatch preview and redraws the canvas
 
 ## Current user-facing behavior
 
 For nodes:
 
-- the picked value is normalized into `bgcolor`
+- the picked value is first normalized to hex regardless of whether the picker UI is showing Hex, RGB, or HSL
+- the normalized hex value is stored in `bgcolor`
 - a lighter derived `color` is calculated for title/body contrast behavior matching current repository expectations
 
 For groups:
 
-- the picked value is written directly to `group.color`
+- the picked value is first normalized to hex regardless of picker UI format
+- the normalized hex value is written directly to `group.color`
 
 ## Integration rules
 

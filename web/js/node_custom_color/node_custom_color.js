@@ -8,6 +8,7 @@ import { patchLightThemeCustomNodeColors } from "../common/light_theme_custom_no
 import {
   getColorTargetPreviewColor,
   getSelectedColorTargets,
+  normalizeColorToHex,
   normalizeHexColor,
   shadeHexColor
 } from "../common/node_color_shared.js";
@@ -195,8 +196,9 @@ app.registerExtension({
     function applyPickerValue() {
       if (!activeTargets.length || !picker?.value) return;
 
+      const pickerHexValue = normalizeColorToHex(picker.value, "#000000");
       for (const target of activeTargets) {
-        applyColorToNode(target, picker.value);
+        applyColorToNode(target, pickerHexValue);
       }
 
       redrawCanvas();
