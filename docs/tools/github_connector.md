@@ -4,7 +4,7 @@
 - Scope: operational workflow for reading from and writing to GitHub through the connector
 - Applies to: GitHub connector sessions for this repository
 - Source of truth level: tool-playbook
-- Last verified commit: 4479a4521e2ea79e6855da1f843825aa95cb4957
+- Last verified commit: bd12b8ce4784561660935fd160d112ec3d6cb92d
 - Update when: the connector workflow changes, branch creation flow changes, or new connector failure modes are learned
 - Supersedes: `github-connector.md` chat handoff notes
 - Superseded by: none
@@ -15,6 +15,17 @@ This file documents the working GitHub connector strategy for this repository.
 
 Use it as an explicit SOP.
 Do not improvise a new write workflow unless the documented one clearly cannot work.
+
+## Early gating rule
+
+For repository tasks that may require GitHub reads or writes:
+
+1. check connector availability first
+2. do that before deeper code investigation, implementation planning, or repository exploration
+3. if the connector is not working or the result is ambiguous, ask the human whether to continue without it
+4. do not continue repository work until the human explicitly confirms that fallback
+
+This rule exists to prevent wasted effort in sessions that cannot actually use the intended repository access path.
 
 ## Core model
 
@@ -38,6 +49,18 @@ Think in terms of:
 
 Do not think of it as a local git shell.
 Do not think of it as a fragile line-patch editor.
+
+## Canonical connector check
+
+The early availability check should be lightweight.
+
+Prefer a simple connector capability check such as:
+
+- listing connector resources
+- calling a lightweight authenticated GitHub action such as profile retrieval
+- otherwise proving that the connector is present and responsive before code work begins
+
+Do not postpone this check until after code analysis.
 
 ## Canonical write workflow
 
@@ -108,6 +131,7 @@ When the workflow fails, classify the failed step precisely:
 - commit creation failure
 - ref update failure
 - verified permission failure
+- early connector availability failure
 
 Report the failed step, not a vague statement like "GitHub connector is unstable".
 
@@ -138,6 +162,71 @@ That retry must begin by:
 
 Do not blindly repeat the same call without refreshing state.
 
+## Wrapper-specific practical notes
+
+These notes capture behavior observed in this repository's current connector wrapper so future sessions do not need to rediscover it.
+
+### Prefer git-object writes over contents writes
+
+In practice, the most reliable write path here is:
+
+1. `create_blob`
+2. `create_tree`
+3. `create_commit`
+4. `update_ref`
+
+Treat that as the default path for updating existing files.
+
+### `create_file` is not a reliable update path for existing files
+
+The wrapper's `create_file` method is not a good general-purpose replacement for updating an existing file.
+
+Observed behavior:
+
+- an update attempt on an existing file surfaced a contents-API-style error saying `"sha" wasn't supplied.`
+- passing `sha` back into the wrapper was not accepted by the wrapper method signature
+
+Practical conclusion:
+
+- do not depend on `create_file` for updating existing files
+- use the blob/tree/commit/ref path instead
+
+### `create_tree` currently accepts the commit SHA as `base_tree_sha`
+
+In this wrapper, using the current head commit SHA as `base_tree_sha` worked in practice.
+
+Practical conclusion:
+
+- when the separate tree SHA is not otherwise exposed, the current head commit SHA is a valid working base for `create_tree` in this environment
+- still resolve the fresh head first and use that exact SHA consistently for tree and commit creation
+
+### `search_commits` is useful for discovery, not authoritative verification
+
+`search_commits` can lag behind the actual updated ref state.
+
+Practical conclusion:
+
+- do not use `search_commits` as the only post-write verification step
+- it is acceptable for finding a likely recent head or for browsing history, but not as the final source of truth after a write
+
+### `fetch_commit(commit_sha)` is a reliable verification tool
+
+`fetch_commit` on the exact new SHA is a good verification step after creating a commit and moving the ref.
+
+Practical conclusion:
+
+- after `update_ref`, verify the exact created commit with `fetch_commit`
+- prefer exact-SHA verification over search-index verification
+
+### Safe exploratory probing is acceptable before touching `main`
+
+If a wrapper behavior is unclear, a narrow test on a throwaway branch is acceptable before updating `main`, provided the session then returns to the canonical SOP.
+
+Practical conclusion:
+
+- exploratory calls are allowed when they reduce risk of corrupting or mis-updating the target branch
+- however, they should be short-lived and should not replace the standard blob/tree/commit/ref flow once the wrapper behavior is understood
+
 ## Working style rules
 
 - prefer direct branch commits over abstract advice when the user wants actual changes
@@ -145,6 +234,7 @@ Do not blindly repeat the same call without refreshing state.
 - read before writing
 - do not overuse force updates unless the user explicitly wants history rewritten
 - do not push the user toward local git after one connector failure if the SOP was not yet exhausted
+- do not continue repository work after an early connector availability failure unless the human explicitly approved that fallback
 
 ## Reporting contract
 

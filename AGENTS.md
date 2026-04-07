@@ -8,7 +8,7 @@ This is the canonical agent operating manual for this repository.
 - Scope: repository-wide working rules, source-of-truth precedence, context maintenance, and anti-drift guardrails
 - Applies to: entire repository
 - Source of truth level: root-rule
-- Last verified commit: 4479a4521e2ea79e6855da1f843825aa95cb4957
+- Last verified commit: bd12b8ce4784561660935fd160d112ec3d6cb92d
 - Update when: workflow rules, context governance, source-of-truth precedence, document lifecycle, or completion requirements change
 - Supersedes: none
 - Superseded by: none
@@ -65,20 +65,34 @@ For any coding session:
 1. read `CLAUDE.md`
 2. read `AGENTS.md`
 3. read `docs/INDEX.md`
-4. inspect the current repo tree and current target branch
-5. read only the feature docs relevant to the files you will touch
-6. read nested `AGENTS.md` files inside touched directories
-7. read the current code before proposing or applying changes
-8. read the relevant active task doc if one exists
-9. read the relevant tool playbook if the workflow depends on one
+4. if the task may require repository reads or writes through GitHub, read `docs/tools/github_connector.md`
+5. check GitHub connector availability before deeper code investigation, implementation planning, or repository analysis
+6. if the connector check fails or remains ambiguous, stop and ask the human whether to continue without a working connector
+7. inspect the current repo tree and current target branch
+8. read only the feature docs relevant to the files you will touch
+9. read nested `AGENTS.md` files inside touched directories
+10. read the current code before proposing or applying changes
+11. read the relevant active task doc if one exists
+12. read the relevant tool playbook if the workflow depends on one
 
 For any GitHub connector write session:
 
-10. read `docs/tools/github_connector.md`
-11. follow that SOP exactly
-12. do not conclude that the connector cannot write after a single failed attempt
+13. read `docs/tools/github_connector.md`
+14. follow that SOP exactly
+15. do not conclude that the connector cannot write after a single failed attempt
 
 ## Repository-specific guardrails
+
+### Check GitHub connector before code work
+
+When the task is about this repository and may require GitHub access:
+
+- verify early that the GitHub connector is present and responding before doing deeper code reasoning or repo exploration
+- treat connector availability as an early gating check, not a late implementation detail
+- if that check fails or is inconclusive, do not silently continue into full code analysis or implementation
+- ask the human whether to continue without a working connector and wait for explicit confirmation before proceeding
+
+This rule exists to avoid wasting time on repository work in a session that cannot actually read or write through the intended path.
 
 ### Work inside the current custom node structure
 
@@ -132,6 +146,7 @@ Do not treat it as authoritative for active drift-sensitive details if code or d
 - Do not create a new context file if an existing file already has the right scope.
 - Do not conclude GitHub connector write access is unavailable after one failed attempt.
 - Do not ask the user to manually apply code if the documented connector workflow should still be able to do the write.
+- Do not continue repository code work after an early connector failure unless the human explicitly confirmed that fallback.
 - Do not leave architecture, compatibility, or workflow docs stale after a non-trivial change.
 
 ## Context file classes
@@ -209,5 +224,7 @@ Before finishing non-trivial work, the agent must verify all of the following:
 If the task involves reading from or writing to GitHub through the connector, read `docs/tools/github_connector.md` first and follow it exactly.
 
 Use the connector as a blob/tree/commit/ref pipeline, not as a local git shell and not as a fragile line-patch tool.
+
+Check connector availability before deeper repository work, and if the connector is not working, obtain explicit human confirmation before continuing without it.
 
 Do not diagnose missing write access until the documented workflow has been exhausted.
