@@ -4,7 +4,7 @@
 - Scope: operational workflow for reading from and writing to GitHub through the connector
 - Applies to: GitHub connector sessions for this repository
 - Source of truth level: tool-playbook
-- Last verified commit: 4479a4521e2ea79e6855da1f843825aa95cb4957
+- Last verified commit: 56a0f139c8df934a692d9825c98ee8c6226e15b5
 - Update when: the connector workflow changes, branch creation flow changes, or new connector failure modes are learned
 - Supersedes: `github-connector.md` chat handoff notes
 - Superseded by: none
@@ -137,6 +137,71 @@ That retry must begin by:
 3. retrying the failed write path with corrected arguments
 
 Do not blindly repeat the same call without refreshing state.
+
+## Wrapper-specific practical notes
+
+These notes capture behavior observed in this repository's current connector wrapper so future sessions do not need to rediscover it.
+
+### Prefer git-object writes over contents writes
+
+In practice, the most reliable write path here is:
+
+1. `create_blob`
+2. `create_tree`
+3. `create_commit`
+4. `update_ref`
+
+Treat that as the default path for updating existing files.
+
+### `create_file` is not a reliable update path for existing files
+
+The wrapper's `create_file` method is not a good general-purpose replacement for updating an existing file.
+
+Observed behavior:
+
+- an update attempt on an existing file surfaced a contents-API-style error saying `"sha" wasn't supplied.`
+- passing `sha` back into the wrapper was not accepted by the wrapper method signature
+
+Practical conclusion:
+
+- do not depend on `create_file` for updating existing files
+- use the blob/tree/commit/ref path instead
+
+### `create_tree` currently accepts the commit SHA as `base_tree_sha`
+
+In this wrapper, using the current head commit SHA as `base_tree_sha` worked in practice.
+
+Practical conclusion:
+
+- when the separate tree SHA is not otherwise exposed, the current head commit SHA is a valid working base for `create_tree` in this environment
+- still resolve the fresh head first and use that exact SHA consistently for tree and commit creation
+
+### `search_commits` is useful for discovery, not authoritative verification
+
+`search_commits` can lag behind the actual updated ref state.
+
+Practical conclusion:
+
+- do not use `search_commits` as the only post-write verification step
+- it is acceptable for finding a likely recent head or for browsing history, but not as the final source of truth after a write
+
+### `fetch_commit(commit_sha)` is a reliable verification tool
+
+`fetch_commit` on the exact new SHA is a good verification step after creating a commit and moving the ref.
+
+Practical conclusion:
+
+- after `update_ref`, verify the exact created commit with `fetch_commit`
+- prefer exact-SHA verification over search-index verification
+
+### Safe exploratory probing is acceptable before touching `main`
+
+If a wrapper behavior is unclear, a narrow test on a throwaway branch is acceptable before updating `main`, provided the session then returns to the canonical SOP.
+
+Practical conclusion:
+
+- exploratory calls are allowed when they reduce risk of corrupting or mis-updating the target branch
+- however, they should be short-lived and should not replace the standard blob/tree/commit/ref flow once the wrapper behavior is understood
 
 ## Working style rules
 
