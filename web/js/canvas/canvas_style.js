@@ -11,6 +11,8 @@ const SETTING_ID_BACKGROUND_RENDER_THROTTLE_ENABLED =
 const DEFAULT_FORCE_HIDE_BACKGROUND_PATTERN = false;
 const DEFAULT_BACKGROUND_RENDER_THROTTLE_ENABLED = false;
 const BACKGROUND_RENDER_THROTTLE_FPS = 5;
+const BACKGROUND_RENDER_THROTTLE_FRAME_GAP =
+  1000 / BACKGROUND_RENDER_THROTTLE_FPS;
 
 const PATCH_STATE_KEY = "__komlevvTweaksCanvasStylePatchState";
 
@@ -129,7 +131,7 @@ function syncCurrentCanvasBackgroundRenderMode() {
   if (nextMode === "hidden") {
     canvas.pause_rendering = true;
   } else if (nextMode === "background") {
-    canvas.maximumFps = BACKGROUND_RENDER_THROTTLE_FPS;
+    setCanvasMaximumFrameGap(canvas, BACKGROUND_RENDER_THROTTLE_FRAME_GAP);
     canvas.pause_rendering = renderState.basePauseRendering;
   } else {
     restoreCanvasRenderBaseState(canvas, renderState);
@@ -215,9 +217,16 @@ function applyBackgroundRenderThrottleEnabled(value) {
 
 function applyAllSettings() {
   ensureCanvasPatch();
-  ensureBackgroundRenderListeners();
+
+  if (currentSettings.backgroundRenderThrottleEnabled) {
+    ensureBackgroundRenderListeners();
+  }
+
   syncCurrentCanvasBackgroundRenderMode();
-  redrawCanvas();
+
+  if (currentSettings.forceHideBackgroundPattern) {
+    redrawCanvas();
+  }
 }
 
 const extension = {
@@ -250,9 +259,6 @@ const extension = {
       onChange: (value) => applyBackgroundRenderThrottleEnabled(value)
     }
   ],
-  setup() {
-    applyAllSettings();
-  },
   init() {
     applyAllSettings();
   }

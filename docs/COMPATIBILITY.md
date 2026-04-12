@@ -39,18 +39,16 @@ Important touchpoints include:
 
 ### Canvas behavior
 
-Anything that patches or wraps:
+Anything that patches or wrapps:
 
 - `drawBackCanvas`
-- `_maximumFrameGap`
 - `maximumFps`
 - `pause_rendering`
 - page visibility or focus-driven canvas render throttling
 
 is version-sensitive.
 
-In `ComfyUI_frontend v1.41.21`, `maximumFps` is not a reliable round-trip storage API for preserving the original render budget because the getter does not mirror the setter correctly.
-Changes to background rendering, background image handling, low-quality rendering, `startRendering()` scheduling, canvas instance lifecycle, or `maximumFps` implementation upstream can affect local patches.
+Changes to background rendering, background image handling, low-quality rendering, `startRendering()` scheduling, or canvas instance lifecycle upstream can affect local patches.
 
 ### Light-theme explicit node color behavior
 

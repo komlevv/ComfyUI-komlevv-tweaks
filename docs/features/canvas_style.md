@@ -2,7 +2,7 @@
 
 - Status: stable
 - Scope: canvas background behavior, pattern suppression, and background render throttling
-- Applies to: `web/js/canvas/**`
+- Applies to: `web/js/canvas/*`
 - Source of truth level: feature
 - Last verified commit: 4479a4521e2ea79e6855da1f843825aa95cb4957
 - Update when: canvas background behavior, settings, patch location, or regression surface changes
@@ -39,15 +39,14 @@ The implementation currently uses two narrow version-sensitive behaviors:
    - `background_image`
    - `clear_background_color`
 
-2. page visibility / focus listeners that manage the current canvas instance by patching:
-   - `_maximumFrameGap`
+2. page visibility / focus listeners that manage the current canvas instance:
+   - `maximumFps`
    - `pause_rendering`
 
 The render-throttle behavior intentionally avoids rewriting the LiteGraph render loop.
 It adjusts the current canvas render budget instead.
 
-The implementation uses `_maximumFrameGap` directly instead of round-tripping through `maximumFps` because the validated frontend version has a broken `maximumFps` getter.
-That direct field touch is intentional and version-sensitive.
+This is intentional and version-sensitive.
 
 ## What not to do
 
@@ -64,8 +63,7 @@ Re-check this subsystem when changing:
 - low-quality zoom-out behavior
 - background image handling
 - clear background color handling
-- `_maximumFrameGap` behavior
-- `maximumFps` getter/setter behavior
+- `maximumFps` behavior
 - `pause_rendering` behavior
 - page `visibilitychange` handling
 - window `focus` / `blur` handling
