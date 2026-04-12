@@ -60,12 +60,16 @@ Canvas Style is the tweak group for graph canvas background behavior.
 Current settings added by this tweak group:
 
 - `Force hide background pattern`
+- `Throttle background rendering`
 
 Current behavior:
 
 - Suppresses the LiteGraph background pattern layer
 - Suppresses the low-zoom background fill that would otherwise darken the canvas during zoom out
 - Keeps the canvas background visually consistent across zoom levels
+- Optionally limits canvas rendering to 5 FPS while the ComfyUI window is unfocused
+- Optionally pauses canvas drawing while the browser tab is hidden
+- Restores normal canvas rendering when the ComfyUI window becomes focused again
 - Works both with and without a custom Canvas Background Image
 
 ### Link Style

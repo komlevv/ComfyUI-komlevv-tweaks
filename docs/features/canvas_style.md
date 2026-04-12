@@ -1,7 +1,7 @@
 # Canvas Style
 
 - Status: stable
-- Scope: canvas background behavior, pattern suppression, and zoom-level visual consistency
+- Scope: canvas background behavior, pattern suppression, and background render throttling
 - Applies to: `web/js/canvas/**`
 - Source of truth level: feature
 - Last verified commit: 4479a4521e2ea79e6855da1f843825aa95cb4957
@@ -19,23 +19,35 @@ This subsystem owns graph canvas background behavior.
 
 ## Current responsibility
 
-The current implementation adds the `Force hide background pattern` setting and uses a `drawBackCanvas` patch to suppress:
+The current implementation adds these `Canvas Style` settings:
 
-- LiteGraph background pattern rendering
-- the low-zoom background fill that would otherwise darken the canvas while zooming out
+- `Force hide background pattern`
+- `Throttle background rendering`
 
-The goal is visual consistency across zoom levels, with or without a custom canvas background image.
+It currently owns:
+
+- LiteGraph background pattern suppression
+- low-zoom background fill suppression
+- canvas background visual consistency across zoom levels
+- canvas render throttling when the page is unfocused or hidden
 
 ## Current patch shape
 
-The implementation currently wraps `drawBackCanvas` and temporarily overrides:
+The implementation currently uses two narrow version-sensitive behaviors:
 
-- `background_image`
-- `clear_background_color`
+1. a `drawBackCanvas` wrapper that temporarily overrides:
+   - `background_image`
+   - `clear_background_color`
 
-before delegating to the original implementation.
+2. page visibility / focus listeners that manage the current canvas instance by patching:
+   - `_maximumFrameGap`
+   - `pause_rendering`
 
-This is intentional and version-sensitive.
+The render-throttle behavior intentionally avoids rewriting the LiteGraph render loop.
+It adjusts the current canvas render budget instead.
+
+The implementation uses `_maximumFrameGap` directly instead of round-tripping through `maximumFps` because the validated frontend version has a broken `maximumFps` getter.
+That direct field touch is intentional and version-sensitive.
 
 ## What not to do
 
@@ -43,6 +55,7 @@ This is intentional and version-sensitive.
 - Do not assume this subsystem owns Selection Toolbox behavior.
 - Do not casually widen this patch into a global rendering rewrite.
 - Do not assume canvas color issues are the same as explicit node/group color issues.
+- Do not patch `draw()` or `startRendering()` here unless the narrower render-budget approach no longer works for the validated frontend version.
 
 ## Regression surface
 
@@ -51,7 +64,18 @@ Re-check this subsystem when changing:
 - low-quality zoom-out behavior
 - background image handling
 - clear background color handling
-- any canvas patch that touches `drawBackCanvas`
+- `_maximumFrameGap` behavior
+- `maximumFps` getter/setter behavior
+- `pause_rendering` behavior
+- page `visibilitychange` handling
+- window `focus` / `blur` handling
+- any other patch that touches canvas render budget or `drawBackCanvas`
+
+Also re-check interactions with any other extension that changes:
+
+- LiteGraph canvas timing
+- canvas pause state
+- canvas FPS limiting
 
 ## Related docs
 
